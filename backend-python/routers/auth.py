@@ -219,28 +219,20 @@ def forgot_password(req: ForgotPasswordRequest):
     if not user_id or not user_email:
         raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
 
-    if nidn and user_id.lower() != nidn.lower():
-        raise HTTPException(
-            status_code=400,
-            detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
-        )
-
+    user_id = str(user_id or nidn or "ADM002")
     token_val = f"tok_{secrets.token_hex(4)}"
     otp_val = "123456"
-
-    clean_out_email = email
-    clean_out_nidn = nidn if nidn else user_id
 
     raise HTTPException(
         status_code=400,
         detail={
             "status": "success",
-            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {clean_out_email}.",
+            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {email}.",
             "token": token_val,
             "otp": otp_val,
-            "email": clean_out_email,
-            "nama": "Pengguna",
-            "nidn": clean_out_nidn
+            "email": email,
+            "nama": user_nama or "Pengguna",
+            "nidn": user_id
         }
     )
 
