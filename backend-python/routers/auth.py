@@ -191,14 +191,9 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 
 @router.post("/forgot_password")
 @router.post("/forgot_password.php")
-async def forgot_password(request: Request, db: Session = Depends(get_db)):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    email = (body.get("email") or "").strip()
-    nidn = (body.get("nidn") or body.get("nid") or body.get("nip") or "").strip()
+def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    email = (req.email or "").strip()
+    nidn = (req.nidn or req.nid or req.nip or "").strip()
 
     if not email:
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Email wajib diisi."})
@@ -278,16 +273,11 @@ async def forgot_password(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
-async def reset_password(request: Request, db: Session = Depends(get_db)):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    email = (body.get("email") or "").strip()
-    otp = (body.get("otp") or "").strip()
-    token = (body.get("token") or "").strip()
-    new_password = (body.get("new_password") or body.get("password") or "").strip()
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    email = (req.email or "").strip()
+    otp = (req.otp or "").strip()
+    token = (req.token or "").strip()
+    new_password = (req.new_password or req.password or "").strip()
 
     if not email or not new_password or (not otp and not token):
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Email, OTP/Token, dan password baru wajib diisi."})

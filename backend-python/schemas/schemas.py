@@ -22,12 +22,17 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 class ForgotPasswordRequest(BaseModel):
-    email: str
+    email: Optional[str] = None
+    nidn: Optional[str] = None
+    nid: Optional[str] = None
+    nip: Optional[str] = None
 
 class ResetPasswordRequest(BaseModel):
-    email: str
-    token: str
-    new_password: str
+    email: Optional[str] = None
+    otp: Optional[str] = None
+    token: Optional[str] = None
+    new_password: Optional[str] = None
+    password: Optional[str] = None
 
 # Master Data Schemas
 class GedungSchema(BaseModel):
