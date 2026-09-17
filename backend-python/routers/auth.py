@@ -192,7 +192,7 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 
 @router.post("/forgot_password")
 @router.post("/forgot_password.php")
-def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(req: ForgotPasswordRequest):
     email = (req.email or "").strip()
     nidn = (req.nidn or req.nid or req.nip or "").strip()
 
@@ -203,29 +203,18 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     user_nama = None
     user_email = None
 
-    if db is not None:
-        try:
-            u = db.query(User).filter(User.email.ilike(email)).first()
-            if u:
-                user_id = str(u.id)
-                user_nama = str(u.nama)
-                user_email = str(u.email)
-        except Exception:
-            pass
-
-    if not user_id:
-        try:
-            url = f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*"
-            res = requests.get(url, headers=SB_HEADERS, timeout=5)
-            if res.status_code == 200:
-                res_data = res.json()
-                if res_data and isinstance(res_data, list) and len(res_data) > 0:
-                    sb_u = res_data[0]
-                    user_id = str(sb_u.get("id") or "")
-                    user_nama = str(sb_u.get("nama") or "")
-                    user_email = str(sb_u.get("email") or "")
-        except Exception:
-            pass
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=id,nama,email"
+        res = requests.get(url, headers=SB_HEADERS, timeout=5)
+        if res.status_code == 200:
+            res_data = res.json()
+            if res_data and isinstance(res_data, list) and len(res_data) > 0:
+                sb_u = res_data[0]
+                user_id = str(sb_u.get("id") or "")
+                user_nama = str(sb_u.get("nama") or "")
+                user_email = str(sb_u.get("email") or "")
+    except Exception:
+        pass
 
     if not user_id or not user_email:
         raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
