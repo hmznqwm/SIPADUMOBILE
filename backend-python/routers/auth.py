@@ -228,15 +228,32 @@ def forgot_password(req: ForgotPasswordRequest):
     token_val = f"tok_{random.randint(10000000, 99999999)}"
     otp_val = f"{random.randint(100000, 999999)}"
 
-    return {
-        "status": "success",
-        "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
-        "token": token_val,
-        "otp": otp_val,
-        "email": user_email,
-        "nama": user_nama,
-        "nidn": user_id
-    }
+    # Optionally persist token & OTP to Supabase password_resets table
+    try:
+        pw_url = f"{SUPABASE_URL}/rest/v1/password_resets"
+        headers_upsert = {**SB_HEADERS, "Prefer": "resolution=merge-duplicates"}
+        payload = {
+            "email": user_email,
+            "token": token_val,
+            "otp": otp_val,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        requests.post(pw_url, headers=headers_upsert, json=payload, timeout=5)
+    except Exception as err:
+        print(f"[FORGOT PW] Supabase password_resets error: {err}")
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "success",
+            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
+            "token": token_val,
+            "otp": otp_val,
+            "email": user_email,
+            "nama": user_nama,
+            "nidn": user_id
+        }
+    )
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
