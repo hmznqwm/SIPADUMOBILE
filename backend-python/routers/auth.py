@@ -9,6 +9,7 @@ import bcrypt
 import secrets
 import urllib.request
 import json
+import random
 
 def patch_user_in_supabase(user_id_or_email: str, data: dict):
     try:
@@ -229,15 +230,14 @@ def forgot_password(req: ForgotPasswordRequest):
             detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
         )
 
-    import random
-    token = f"tok_{random.randint(10000000, 99999999)}"
-    otp = f"{random.randint(100000, 999999)}"
+    token_val = f"tok_{random.randint(10000000, 99999999)}"
+    otp_val = f"{random.randint(100000, 999999)}"
 
     return {
         "status": "success",
         "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
-        "token": token,
-        "otp": otp,
+        "token": token_val,
+        "otp": otp_val,
         "email": user_email,
         "nama": user_nama,
         "nidn": user_id
