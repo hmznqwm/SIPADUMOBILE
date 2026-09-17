@@ -196,47 +196,55 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     nidn = (req.nidn or req.nid or req.nip or "").strip()
 
     if not email:
-        raise HTTPException(status_code=400, detail={"status": "error", "message": "Email wajib diisi."})
-
-    user_info = None
-    try:
-        r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*",
-            headers=SB_HEADERS,
-            timeout=5
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "error", "message": "Email wajib diisi."}
         )
-        if r.status_code == 200 and r.json():
-            sb_u = r.json()[0]
-            user_info = {"id": sb_u["id"], "nama": sb_u["nama"], "email": sb_u["email"]}
-    except Exception:
-        pass
 
-    if not user_info and db is not None:
+    # 1. Cari user dari database lokal/ORM dulu (sama seperti login)
+    user = None
+    if db is not None:
         try:
-            u = db.query(User).filter(User.email.ilike(email)).first()
-            if u:
-                user_info = {"id": u.id, "nama": u.nama, "email": u.email}
+            user = db.query(User).filter(User.email.ilike(email)).first()
         except Exception:
-            try:
-                db.rollback()
-            except Exception:
-                pass
+            pass
 
-    if not user_info:
-        raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
+    # 2. Jika tidak ada di lokal, cari dari Supabase REST API
+    user_id = None
+    user_nama = None
+    user_email = None
 
-    user_id = str(user_info["id"])
-    user_nama = str(user_info["nama"])
-    user_email = str(user_info["email"])
+    if user:
+        user_id = str(user.id)
+        user_nama = str(user.nama)
+        user_email = str(user.email)
+    else:
+        try:
+            r = requests.get(
+                f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*",
+                headers=SB_HEADERS,
+                timeout=5
+            )
+            if r.status_code == 200 and r.json():
+                sb_u = r.json()[0]
+                user_id = str(sb_u["id"])
+                user_nama = str(sb_u["nama"])
+                user_email = str(sb_u["email"])
+        except Exception:
+            pass
 
-    # Validate NIDN/NIP match with user_id
-    if nidn and user_id.lower() != nidn.lower():
+    if not user_email:
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."}
+        )
+
+    if nidn and user_id and user_id.lower() != nidn.lower():
         raise HTTPException(
             status_code=400,
             detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
         )
 
-    # Generate 6-digit OTP & token
     token = secrets.token_hex(16)
     otp = f"{secrets.randbelow(900000) + 100000}"
 
