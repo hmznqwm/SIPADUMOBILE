@@ -211,13 +211,16 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    if not user_info:
+    if not user_info and db is not None:
         try:
             u = db.query(User).filter(User.email.ilike(email)).first()
             if u:
                 user_info = {"id": u.id, "nama": u.nama, "email": u.email}
         except Exception:
-            db.rollback()
+            try:
+                db.rollback()
+            except Exception:
+                pass
 
     if not user_info:
         raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
