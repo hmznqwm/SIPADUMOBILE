@@ -13,11 +13,17 @@ if (os.getenv("VERCEL") or os.getenv("VERCEL_ENV")) and DATABASE_URL.startswith(
 
 # Database Engine Configuration
 if DATABASE_URL.startswith("sqlite"):
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        pool_pre_ping=True
-    )
+    connect_args = {"check_same_thread": False}
+    extra_kwargs = {}
+    if ":memory:" in DATABASE_URL:
+        from sqlalchemy.pool import StaticPool
+        extra_kwargs["poolclass"] = StaticPool
+        extra_kwargs["connect_args"] = connect_args
+    else:
+        extra_kwargs["connect_args"] = connect_args
+        extra_kwargs["pool_pre_ping"] = True
+
+    engine = create_engine(DATABASE_URL, **extra_kwargs)
 else:
     engine = create_engine(
         DATABASE_URL,
