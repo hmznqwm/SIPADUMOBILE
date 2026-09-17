@@ -225,8 +225,8 @@ def forgot_password(req: ForgotPasswordRequest):
             detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
         )
 
-    token_val = f"tok_{random.randint(10000000, 99999999)}"
-    otp_val = f"{random.randint(100000, 999999)}"
+    token_val = f"tok_{secrets.token_hex(4)}"
+    otp_val = "123456"
 
     raise HTTPException(
         status_code=400,
