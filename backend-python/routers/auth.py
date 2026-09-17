@@ -21,22 +21,14 @@ def patch_user_in_supabase(user_id_or_email: str, data: dict):
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-def verify_password(plain_password: str, hashed_password: str, user_id: str = "") -> bool:
-    if not plain_password:
-        return False
-    clean_uid = str(user_id or "").strip().upper()
-    clean_pass = str(plain_password or "").strip()
-    if clean_uid in ["ADM001", "ADMIN", "SUPERADMIN"] and clean_pass in ["admin123", "ADM001", "password123"]:
-        return True
-    if clean_pass == clean_uid or clean_pass in ["admin123", "password123"]:
-        return True
-    if not hashed_password:
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    if not plain_password or not hashed_password:
         return False
     normalized_hash = hashed_password
     if normalized_hash.startswith("$2y$"):
         normalized_hash = "$2b$" + normalized_hash[4:]
     try:
-        if bcrypt.checkpw(clean_pass.encode("utf-8"), normalized_hash.encode("utf-8")):
+        if bcrypt.checkpw(plain_password.encode("utf-8"), normalized_hash.encode("utf-8")):
             return True
     except Exception:
         pass
@@ -76,10 +68,10 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if clean_ident.endswith("@gmail"):
         clean_ident += ".com"
 
-    # 1. Coba ambil user dari Supabase REST API (Primary Source of Truth)
+    # 1. Ambil data user langsung dari Supabase REST API (Source of Truth)
     user = None
     try:
-        url = f"{SUPABASE_URL}/rest/v1/users?or=(id.eq.{ident},email.eq.{ident},email.ilike.{clean_ident})"
+        url = f"{SUPABASE_URL}/rest/v1/users?or=(id.eq.{ident},id.ilike.{ident},email.eq.{ident},email.ilike.{clean_ident})"
         resp = requests.get(url, headers=SB_HEADERS, timeout=5)
         if resp.status_code == 200:
             users_data = resp.json()
@@ -101,7 +93,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    # 2. Fallback ke SQLite jika Supabase REST tidak merespons
+    # 2. Fallback ke SQLite lokal jika koneksi Supabase Cloud bermasalah
     if not user:
         try:
             user = db.query(User).filter(
@@ -116,8 +108,8 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             detail={"status": "error", "message": "Nomor Induk / Email tidak ditemukan."}
         )
 
-    # Verifikasi kredensial
-    is_valid = verify_password(password, user.password, str(user.id or ""))
+    # 3. Verifikasi password murni secara dinamis via bcrypt (tanpa hardcode)
+    is_valid = verify_password(password, user.password)
 
     if not is_valid:
         raise HTTPException(
