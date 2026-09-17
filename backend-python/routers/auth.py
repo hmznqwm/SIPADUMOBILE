@@ -198,14 +198,16 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     if not email:
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Email wajib diisi."})
 
-    user = None
+    user_info = None
     try:
-        user = db.query(User).filter(User.email.ilike(email)).first()
+        u = db.query(User).filter(User.email.ilike(email)).first()
+        if u:
+            user_info = {"id": u.id, "nama": u.nama, "email": u.email}
     except Exception:
         db.rollback()
 
     # If not found locally, query directly from Supabase
-    if not user:
+    if not user_info:
         try:
             r = requests.get(
                 f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*",
@@ -214,29 +216,19 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
             )
             if r.status_code == 200 and r.json():
                 sb_u = r.json()[0]
-                user = User(
-                    id=sb_u["id"],
-                    nama=sb_u["nama"],
-                    email=sb_u["email"],
-                    password=sb_u.get("password") or "password123",
-                    role=sb_u.get("role") or "dosen",
-                    jurusan_id=sb_u.get("jurusan_id"),
-                    jurusan_nama=sb_u.get("jurusan_nama"),
-                    fakultas_nama=sb_u.get("fakultas_nama")
-                )
-                try:
-                    db.add(user)
-                    db.commit()
-                except Exception:
-                    db.rollback()
+                user_info = {"id": sb_u["id"], "nama": sb_u["nama"], "email": sb_u["email"]}
         except Exception:
             pass
 
-    if not user:
+    if not user_info:
         raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
 
-    # Validate NIDN/NIP match with user.id in Supabase
-    if nidn and user.id.lower() != nidn.lower():
+    user_id = str(user_info["id"])
+    user_nama = str(user_info["nama"])
+    user_email = str(user_info["email"])
+
+    # Validate NIDN/NIP match with user_id
+    if nidn and user_id.lower() != nidn.lower():
         raise HTTPException(
             status_code=400,
             detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
@@ -249,9 +241,9 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
 
     # Safely attempt local DB reset record storage
     try:
-        db.query(PasswordReset).filter(PasswordReset.email.ilike(email)).delete()
+        db.query(PasswordReset).filter(PasswordReset.email.ilike(user_email)).delete()
         reset_record = PasswordReset(
-            email=user.email,
+            email=user_email,
             token=token,
             otp=otp,
             expires_at=expires_at
@@ -263,12 +255,12 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
 
     return {
         "status": "success",
-        "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user.email}.",
+        "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
         "token": token,
         "otp": otp,
-        "email": user.email,
-        "nama": user.nama,
-        "nidn": user.id
+        "email": user_email,
+        "nama": user_nama,
+        "nidn": user_id
     }
 
 @router.post("/reset_password")
