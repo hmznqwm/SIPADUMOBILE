@@ -37,11 +37,19 @@ app.add_middleware(
 # Security Headers Middleware
 @app.middleware("http")
 async def add_security_headers(request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    return response
+    try:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": {"status": "error", "message": f"Middleware Error: {type(e).__name__} - {str(e)}"}}
+        )
 
 # Mount all API routers under both /api and root / for maximum compatibility
 app.include_router(auth.router, prefix="/api")

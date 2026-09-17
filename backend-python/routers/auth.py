@@ -193,50 +193,58 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 @router.post("/forgot_password")
 @router.post("/forgot_password.php")
 def forgot_password(req: ForgotPasswordRequest):
-    email = (req.email or "").strip()
-    nidn = (req.nidn or req.nid or req.nip or "").strip()
-
-    if not email:
-        raise HTTPException(status_code=400, detail={"status": "error", "message": "Email wajib diisi."})
-
-    user_id = None
-    user_nama = None
-    user_email = None
-
     try:
-        url = f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=id,nama,email"
-        res = requests.get(url, headers=SB_HEADERS, timeout=5)
-        if res.status_code == 200:
-            res_data = res.json()
-            if res_data and isinstance(res_data, list) and len(res_data) > 0:
-                sb_u = res_data[0]
-                user_id = str(sb_u.get("id") or "")
-                user_nama = str(sb_u.get("nama") or "")
-                user_email = str(sb_u.get("email") or "")
-    except Exception:
-        pass
+        email = (req.email or "").strip()
+        nidn = (req.nidn or req.nid or req.nip or "").strip()
 
-    if not user_id or not user_email:
-        raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
+        if not email:
+            raise HTTPException(status_code=400, detail={"status": "error", "message": "Email wajib diisi."})
 
-    if nidn and user_id.lower() != nidn.lower():
-        raise HTTPException(
-            status_code=400,
-            detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
+        user_id = None
+        user_nama = None
+        user_email = None
+
+        try:
+            url = f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=id,nama,email"
+            res = requests.get(url, headers=SB_HEADERS, timeout=5)
+            if res.status_code == 200:
+                res_data = res.json()
+                if res_data and isinstance(res_data, list) and len(res_data) > 0:
+                    sb_u = res_data[0]
+                    user_id = str(sb_u.get("id") or "")
+                    user_nama = str(sb_u.get("nama") or "")
+                    user_email = str(sb_u.get("email") or "")
+        except Exception as sb_err:
+            print(f"Supabase error: {sb_err}")
+
+        if not user_id or not user_email:
+            raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
+
+        if nidn and user_id.lower() != nidn.lower():
+            raise HTTPException(
+                status_code=400,
+                detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
+            )
+
+        token_val = f"tok_{random.randint(10000000, 99999999)}"
+        otp_val = f"{random.randint(100000, 999999)}"
+
+        return {
+            "status": "success",
+            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
+            "token": token_val,
+            "otp": otp_val,
+            "email": user_email,
+            "nama": user_nama,
+            "nidn": user_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"detail": {"status": "error", "message": f"Endpoint Error: {type(e).__name__} - {str(e)}"}}
         )
-
-    token_val = f"tok_{random.randint(10000000, 99999999)}"
-    otp_val = f"{random.randint(100000, 999999)}"
-
-    return {
-        "status": "success",
-        "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
-        "token": token_val,
-        "otp": otp_val,
-        "email": user_email,
-        "nama": user_nama,
-        "nidn": user_id
-    }
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
