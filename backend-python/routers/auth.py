@@ -192,7 +192,7 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 
 @router.post("/forgot_password")
 @router.post("/forgot_password.php")
-def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(req: ForgotPasswordRequest):
     email = (req.email or "").strip()
     nidn = (req.nidn or req.nid or req.nip or "").strip()
 
@@ -200,26 +200,17 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Email wajib diisi."})
 
     user_data = None
-    if db is not None:
-        try:
-            u = db.query(User).filter(User.email.ilike(email)).first()
-            if u:
-                user_data = {"id": u.id, "nama": u.nama, "email": u.email}
-        except Exception:
-            pass
-
-    if not user_data:
-        try:
-            r = requests.get(
-                f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*",
-                headers=SB_HEADERS,
-                timeout=5
-            )
-            if r.status_code == 200 and r.json():
-                sb_u = r.json()[0]
-                user_data = {"id": sb_u["id"], "nama": sb_u["nama"], "email": sb_u["email"]}
-        except Exception:
-            pass
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*",
+            headers=SB_HEADERS,
+            timeout=5
+        )
+        if r.status_code == 200 and r.json():
+            sb_u = r.json()[0]
+            user_data = {"id": sb_u["id"], "nama": sb_u["nama"], "email": sb_u["email"]}
+    except Exception:
+        pass
 
     if not user_data:
         raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
@@ -238,22 +229,19 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     token = f"tok_{random.randint(10000000, 99999999)}"
     otp = f"{random.randint(100000, 999999)}"
 
-    return JSONResponse(
-        status_code=200,
-        content={
-            "status": "success",
-            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
-            "token": str(token),
-            "otp": str(otp),
-            "email": str(user_email),
-            "nama": str(user_nama),
-            "nidn": str(user_id)
-        }
-    )
+    return {
+        "status": "success",
+        "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
+        "token": token,
+        "otp": otp,
+        "email": user_email,
+        "nama": user_nama,
+        "nidn": user_id
+    }
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
-def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+def reset_password(req: ResetPasswordRequest):
     email = (req.email or "").strip()
     otp = (req.otp or "").strip()
     token = (req.token or "").strip()
@@ -263,21 +251,9 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Email, OTP/Token, dan password baru wajib diisi."})
 
     hashed = get_password_hash(new_password)
-
-    user = db.query(User).filter(User.email.ilike(email)).first()
-    if user:
-        user.password = hashed
-        try:
-            db.commit()
-        except Exception:
-            db.rollback()
-
     patch_user_in_supabase(email, {"password": hashed})
 
-    return JSONResponse(
-        status_code=200,
-        content={
-            "status": "success",
-            "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
-        }
-    )
+    return {
+        "status": "success",
+        "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
+    }
