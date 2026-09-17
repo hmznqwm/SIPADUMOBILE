@@ -198,10 +198,16 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     if not email:
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Email wajib diisi."})
 
-    user = db.query(User).filter(User.email.ilike(email)).first()
+    user_data = None
+    if db is not None:
+        try:
+            u = db.query(User).filter(User.email.ilike(email)).first()
+            if u:
+                user_data = {"id": u.id, "nama": u.nama, "email": u.email}
+        except Exception:
+            pass
 
-    # If not found locally, query Supabase Cloud
-    if not user:
+    if not user_data:
         try:
             r = requests.get(
                 f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*",
@@ -210,25 +216,16 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
             )
             if r.status_code == 200 and r.json():
                 sb_u = r.json()[0]
-                user = User(
-                    id=sb_u["id"],
-                    nama=sb_u["nama"],
-                    email=sb_u["email"],
-                    password=sb_u.get("password") or "password123",
-                    role=sb_u.get("role") or "dosen",
-                    jurusan_id=sb_u.get("jurusan_id"),
-                    jurusan_nama=sb_u.get("jurusan_nama"),
-                    fakultas_nama=sb_u.get("fakultas_nama")
-                )
+                user_data = {"id": sb_u["id"], "nama": sb_u["nama"], "email": sb_u["email"]}
         except Exception:
             pass
 
-    if not user:
+    if not user_data:
         raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
 
-    user_id = str(user.id)
-    user_nama = str(user.nama)
-    user_email = str(user.email)
+    user_id = str(user_data["id"])
+    user_nama = str(user_data["nama"])
+    user_email = str(user_data["email"])
 
     if nidn and user_id.lower() != nidn.lower():
         raise HTTPException(
