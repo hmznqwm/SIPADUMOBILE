@@ -8,21 +8,14 @@ from models.models import User, PasswordReset
 from schemas.schemas import LoginRequest, GoogleLoginRequest, ChangePasswordRequest, ForgotPasswordRequest, ResetPasswordRequest
 import bcrypt
 import secrets
-import urllib.request
+import requests
 import json
 import random
 
 def patch_user_in_supabase(user_id_or_email: str, data: dict):
     try:
         url = f"{SUPABASE_URL}/rest/v1/users?or=(id.eq.{user_id_or_email},email.ilike.{user_id_or_email})"
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(data).encode("utf-8"),
-            headers=SB_HEADERS,
-            method="PATCH"
-        )
-        with urllib.request.urlopen(req, timeout=5):
-            pass
+        requests.patch(url, headers=SB_HEADERS, json=data, timeout=5)
     except Exception:
         pass
 
@@ -210,10 +203,10 @@ def forgot_password(req: ForgotPasswordRequest):
         user_data = None
         try:
             url = f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*"
-            req_obj = urllib.request.Request(url, headers=SB_HEADERS)
-            with urllib.request.urlopen(req_obj, timeout=5) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                if data:
+            res = requests.get(url, headers=SB_HEADERS, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                if data and isinstance(data, list):
                     sb_u = data[0]
                     user_data = {"id": sb_u.get("id"), "nama": sb_u.get("nama"), "email": sb_u.get("email")}
         except Exception:
