@@ -228,15 +228,18 @@ def forgot_password(req: ForgotPasswordRequest):
     token_val = f"tok_{random.randint(10000000, 99999999)}"
     otp_val = f"{random.randint(100000, 999999)}"
 
-    return {
-        "status": "success",
-        "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
-        "token": token_val,
-        "otp": otp_val,
-        "email": user_email,
-        "nama": user_nama,
-        "nidn": user_id
-    }
+    raise HTTPException(
+        status_code=200,
+        detail={
+            "status": "success",
+            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
+            "token": token_val,
+            "otp": otp_val,
+            "email": user_email,
+            "nama": user_nama,
+            "nidn": user_id
+        }
+    )
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
@@ -252,9 +255,9 @@ def reset_password(req: ResetPasswordRequest):
     hashed = get_password_hash(new_password)
     patch_user_in_supabase(email, {"password": hashed})
 
-    return JSONResponse(
+    raise HTTPException(
         status_code=200,
-        content={
+        detail={
             "status": "success",
             "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
         }
