@@ -229,15 +229,18 @@ def forgot_password(req: ForgotPasswordRequest):
         token_val = f"tok_{random.randint(10000000, 99999999)}"
         otp_val = f"{random.randint(100000, 999999)}"
 
-        return {
-            "status": "success",
-            "message": "Kode OTP pemulihan kata sandi telah dikirimkan.",
-            "token": token_val,
-            "otp": otp_val,
-            "email": str(user_email or ""),
-            "nama": "Pengguna",
-            "nidn": str(user_id or "")
-        }
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "success",
+                "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
+                "token": token_val,
+                "otp": otp_val,
+                "email": user_email,
+                "nama": user_nama,
+                "nidn": user_id
+            }
+        )
     except HTTPException:
         raise
     except Exception as e:
