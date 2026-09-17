@@ -72,7 +72,7 @@ def health_check():
     return {
         "status": "success",
         "message": "SmartSchedule Python FastAPI Backend is running smoothly on Vercel!",
-        "version": "2.0.0",
+        "version": "2.0.2-DEBUG-AUTH",
         "author": "Hamizan Qowiem",
         "docs_url": "/docs"
     }
