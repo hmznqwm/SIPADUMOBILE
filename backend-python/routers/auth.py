@@ -191,10 +191,12 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 
 @router.post("/forgot_password")
 @router.post("/forgot_password.php")
-def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(req: dict = None, db: Session = Depends(get_db)):
     try:
-        email = (req.email or "").strip()
-        nidn = (req.nidn or req.nid or req.nip or "").strip()
+        if req is None:
+            req = {}
+        email = str(req.get("email") or "").strip()
+        nidn = str(req.get("nidn") or req.get("nid") or req.get("nip") or "").strip()
 
         if not email:
             raise HTTPException(
@@ -267,30 +269,41 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
-def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
-    email = (req.email or "").strip()
-    otp = (req.otp or "").strip()
-    token = (req.token or "").strip()
-    new_password = (req.new_password or req.password or "").strip()
-
-    if not email or not new_password or (not otp and not token):
-        raise HTTPException(status_code=400, detail={"status": "error", "message": "Email, OTP/Token, dan password baru wajib diisi."})
-
-    hashed = get_password_hash(new_password)
-
-    # Update local DB if available
+def reset_password(req: dict = None, db: Session = Depends(get_db)):
     try:
-        user = db.query(User).filter(User.email.ilike(email)).first()
-        if user:
-            user.password = hashed
-            db.commit()
-    except Exception:
-        db.rollback()
+        if req is None:
+            req = {}
+        email = str(req.get("email") or "").strip()
+        otp = str(req.get("otp") or "").strip()
+        token = str(req.get("token") or "").strip()
+        new_password = str(req.get("new_password") or req.get("password") or "").strip()
 
-    # Always update Supabase Cloud directly
-    patch_user_in_supabase(email, {"password": hashed})
+        if not email or not new_password or (not otp and not token):
+            raise HTTPException(status_code=400, detail={"status": "error", "message": "Email, OTP/Token, dan password baru wajib diisi."})
 
-    return {
-        "status": "success",
-        "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
-    }
+        hashed = get_password_hash(new_password)
+
+        # Update local DB if available
+        if db is not None:
+            try:
+                user = db.query(User).filter(User.email.ilike(email)).first()
+                if user:
+                    user.password = hashed
+                    db.commit()
+            except Exception:
+                pass
+
+        # Always update Supabase Cloud directly
+        patch_user_in_supabase(email, {"password": hashed})
+
+        return {
+            "status": "success",
+            "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
+        }
+    except HTTPException:
+        raise
+    except Exception as err:
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "error", "message": f"Gagal memproses reset password: {str(err)}"}
+        )
