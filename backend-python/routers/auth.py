@@ -191,23 +191,17 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 
 @router.post("/forgot_password")
 @router.post("/forgot_password.php")
-async def forgot_password(req: dict = None):
-    try:
-        if req is None:
-            req = {}
-        email = str(req.get("email") or "").strip()
-        nidn = str(req.get("nidn") or req.get("nid") or req.get("nip") or "").strip()
+def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    email = (req.email or "").strip()
+    nidn = (req.nidn or req.nid or req.nip or "").strip()
 
-        if not email:
-            raise HTTPException(
-                status_code=400,
-                detail={"status": "error", "message": "Email wajib diisi."}
-            )
+    if not email:
+        raise HTTPException(status_code=400, detail={"status": "error", "message": "Email wajib diisi."})
 
-        user_id = None
-        user_nama = None
-        user_email = None
+    user = db.query(User).filter(User.email.ilike(email)).first()
 
+    # If not found locally, query Supabase Cloud
+    if not user:
         try:
             r = requests.get(
                 f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*",
@@ -216,72 +210,70 @@ async def forgot_password(req: dict = None):
             )
             if r.status_code == 200 and r.json():
                 sb_u = r.json()[0]
-                user_id = str(sb_u.get("id") or "")
-                user_nama = str(sb_u.get("nama") or "")
-                user_email = str(sb_u.get("email") or "")
+                user = User(
+                    id=sb_u["id"],
+                    nama=sb_u["nama"],
+                    email=sb_u["email"],
+                    password=sb_u.get("password") or "password123",
+                    role=sb_u.get("role") or "dosen",
+                    jurusan_id=sb_u.get("jurusan_id"),
+                    jurusan_nama=sb_u.get("jurusan_nama"),
+                    fakultas_nama=sb_u.get("fakultas_nama")
+                )
         except Exception:
             pass
 
-        if not user_email:
-            raise HTTPException(
-                status_code=400,
-                detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."}
-            )
+    if not user:
+        raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
 
-        if nidn and user_id and user_id.lower() != nidn.lower():
-            raise HTTPException(
-                status_code=400,
-                detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
-            )
+    user_id = str(user.id)
+    user_nama = str(user.nama)
+    user_email = str(user.email)
 
-        import random
-        token = f"tok_{random.randint(10000000, 99999999)}"
-        otp = f"{random.randint(100000, 999999)}"
-
-        return {
-            "status": "success",
-            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
-            "token": token,
-            "otp": otp,
-            "email": user_email,
-            "nama": user_nama,
-            "nidn": user_id
-        }
-    except HTTPException:
-        raise
-    except Exception as err:
+    if nidn and user_id.lower() != nidn.lower():
         raise HTTPException(
             status_code=400,
-            detail={"status": "error", "message": f"Gagal memproses lupa password: {str(err)}"}
+            detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
         )
+
+    import random
+    token = f"tok_{random.randint(10000000, 99999999)}"
+    otp = f"{random.randint(100000, 999999)}"
+
+    return {
+        "status": "success",
+        "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
+        "token": token,
+        "otp": otp,
+        "email": user_email,
+        "nama": user_nama,
+        "nidn": user_id
+    }
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
-async def reset_password(req: dict = None):
-    try:
-        if req is None:
-            req = {}
-        email = str(req.get("email") or "").strip()
-        otp = str(req.get("otp") or "").strip()
-        token = str(req.get("token") or "").strip()
-        new_password = str(req.get("new_password") or req.get("password") or "").strip()
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    email = (req.email or "").strip()
+    otp = (req.otp or "").strip()
+    token = (req.token or "").strip()
+    new_password = (req.new_password or req.password or "").strip()
 
-        if not email or not new_password or (not otp and not token):
-            raise HTTPException(status_code=400, detail={"status": "error", "message": "Email, OTP/Token, dan password baru wajib diisi."})
+    if not email or not new_password or (not otp and not token):
+        raise HTTPException(status_code=400, detail={"status": "error", "message": "Email, OTP/Token, dan password baru wajib diisi."})
 
-        hashed = get_password_hash(new_password)
+    hashed = get_password_hash(new_password)
 
-        # Always update Supabase Cloud directly
-        patch_user_in_supabase(email, {"password": hashed})
+    user = db.query(User).filter(User.email.ilike(email)).first()
+    if user:
+        user.password = hashed
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
 
-        return {
-            "status": "success",
-            "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
-        }
-    except HTTPException:
-        raise
-    except Exception as err:
-        raise HTTPException(
-            status_code=400,
-            detail={"status": "error", "message": f"Gagal memproses reset password: {str(err)}"}
-        )
+    patch_user_in_supabase(email, {"password": hashed})
+
+    return {
+        "status": "success",
+        "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
+    }
