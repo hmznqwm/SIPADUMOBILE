@@ -236,7 +236,7 @@ def forgot_password(req: ForgotPasswordRequest):
             "token": token_val,
             "otp": otp_val,
             "email": user_email,
-            "nama": user_nama,
+            "nama": "Pengguna",
             "nidn": user_id
         }
     )
