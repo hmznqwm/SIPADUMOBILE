@@ -193,8 +193,8 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 @router.post("/forgot_password")
 @router.post("/forgot_password.php")
 def forgot_password(req: ForgotPasswordRequest):
-    email = str(req.email or "").strip()
-    nidn = str(req.nidn or req.nid or req.nip or "").strip()
+    email = (req.email or "").strip()
+    nidn = (req.nidn or req.nid or req.nip or "").strip()
 
     if not email:
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Email wajib diisi."})
@@ -206,7 +206,7 @@ def forgot_password(req: ForgotPasswordRequest):
     try:
         url = f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=id,nama,email"
         res = requests.get(url, headers=SB_HEADERS, timeout=5)
-        if res.status_code == 200:
+        if res.status_code == 200 and res.json():
             res_data = res.json()
             if isinstance(res_data, list) and len(res_data) > 0:
                 sb_u = res_data[0]
@@ -214,27 +214,29 @@ def forgot_password(req: ForgotPasswordRequest):
                 user_nama = str(sb_u.get("nama") or "").strip()
                 user_email = str(sb_u.get("email") or "").strip()
     except Exception as e:
-        print(f"[FORGOT PW] Supabase error: {e}")
+        print(f"[FORGOT PW] Supabase query error: {e}")
 
     if not user_id or not user_email:
         raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
 
-    user_id = str(user_id or nidn or "ADM002")
-    token_val = f"tok_{secrets.token_hex(4)}"
-    otp_val = "123456"
+    if nidn and user_id.lower() != nidn.lower():
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
+        )
 
-    raise HTTPException(
-        status_code=400,
-        detail={
-            "status": "success",
-            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {email}.",
-            "token": token_val,
-            "otp": otp_val,
-            "email": email,
-            "nama": user_nama or "Pengguna",
-            "nidn": user_id
-        }
-    )
+    token_val = f"tok_{random.randint(10000000, 99999999)}"
+    otp_val = f"{random.randint(100000, 999999)}"
+
+    return {
+        "status": "success",
+        "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
+        "token": token_val,
+        "otp": otp_val,
+        "email": user_email,
+        "nama": user_nama,
+        "nidn": user_id
+    }
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
@@ -250,10 +252,7 @@ def reset_password(req: ResetPasswordRequest):
     hashed = get_password_hash(new_password)
     patch_user_in_supabase(email, {"password": hashed})
 
-    raise HTTPException(
-        status_code=400,
-        detail={
-            "status": "success",
-            "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
-        }
-    )
+    return {
+        "status": "success",
+        "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
+    }
