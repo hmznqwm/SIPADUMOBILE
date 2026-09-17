@@ -1,13 +1,15 @@
 // File: api_config.dart
-// Deskripsi: File konfigurasi URL dasar (base URL) dan saklar mock backend untuk REST API server.
-// Fungsi: Menyediakan alamat endpoint server backend PHP/MySQL online dan pengaturan mode pengujian.
+// Deskripsi: File konfigurasi URL dasar (base URL) untuk terhubung ke Python FastAPI Backend.
 
 class ApiConfig {
-  /// Ubah ke false untuk menghubungkan aplikasi Flutter langsung ke server backend online
+  /// Ubah ke false agar aplikasi Flutter terhubung langsung ke Python FastAPI Server (Database SQLite smartschedule.db)
   static const bool useMockBackend = false;
 
-  /// URL Backend REST API Server Active (InfinityFree / Custom Host):
-  static const String baseUrl = 'http://sistemjadwalpintar.freedev.app/api';
+  /// URL Backend Python FastAPI (Host Laptop Wi-Fi IP / Localhost):
+  static const String baseUrl = 'http://192.168.100.248:8000/api';
+
+  /// Fallback URL untuk emulator / local loopback:
+  static const String localFallbackUrl = 'http://127.0.0.1:8000/api';
 
   /// Google OAuth Web Client ID
   static const String googleClientId = '552288350914-qq3qt5b2j851vgvl4dv0kabjhd3dvjqm.apps.googleusercontent.com';
