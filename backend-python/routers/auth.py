@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from core.database import get_db
@@ -237,15 +238,18 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     token = f"tok_{random.randint(10000000, 99999999)}"
     otp = f"{random.randint(100000, 999999)}"
 
-    return {
-        "status": "success",
-        "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
-        "token": token,
-        "otp": otp,
-        "email": user_email,
-        "nama": user_nama,
-        "nidn": user_id
-    }
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "success",
+            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
+            "token": str(token),
+            "otp": str(otp),
+            "email": str(user_email),
+            "nama": str(user_nama),
+            "nidn": str(user_id)
+        }
+    )
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
@@ -270,7 +274,10 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
 
     patch_user_in_supabase(email, {"password": hashed})
 
-    return {
-        "status": "success",
-        "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
-    }
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "success",
+            "message": "Kata sandi Anda berhasil diperbarui! Silakan login dengan kata sandi baru."
+        }
+    )
