@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from core.database import get_db
+from core.config import SUPABASE_URL, SB_HEADERS
 from models.models import User, PasswordReset
 from schemas.schemas import LoginRequest, GoogleLoginRequest, ChangePasswordRequest, ForgotPasswordRequest, ResetPasswordRequest
 import bcrypt
