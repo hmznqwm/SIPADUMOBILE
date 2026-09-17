@@ -231,12 +231,12 @@ def forgot_password(req: ForgotPasswordRequest):
 
         return {
             "status": "success",
-            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
+            "message": "Kode OTP pemulihan kata sandi telah dikirimkan.",
             "token": token_val,
             "otp": otp_val,
-            "email": user_email,
-            "nama": user_nama,
-            "nidn": user_id
+            "email": str(user_email or ""),
+            "nama": "Pengguna",
+            "nidn": str(user_id or "")
         }
     except HTTPException:
         raise
