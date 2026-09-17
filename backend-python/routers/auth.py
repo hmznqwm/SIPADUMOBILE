@@ -200,25 +200,24 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
 
     user_info = None
     try:
-        u = db.query(User).filter(User.email.ilike(email)).first()
-        if u:
-            user_info = {"id": u.id, "nama": u.nama, "email": u.email}
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*",
+            headers=SB_HEADERS,
+            timeout=5
+        )
+        if r.status_code == 200 and r.json():
+            sb_u = r.json()[0]
+            user_info = {"id": sb_u["id"], "nama": sb_u["nama"], "email": sb_u["email"]}
     except Exception:
-        db.rollback()
+        pass
 
-    # If not found locally, query directly from Supabase
     if not user_info:
         try:
-            r = requests.get(
-                f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*",
-                headers=SB_HEADERS,
-                timeout=5
-            )
-            if r.status_code == 200 and r.json():
-                sb_u = r.json()[0]
-                user_info = {"id": sb_u["id"], "nama": sb_u["nama"], "email": sb_u["email"]}
+            u = db.query(User).filter(User.email.ilike(email)).first()
+            if u:
+                user_info = {"id": u.id, "nama": u.nama, "email": u.email}
         except Exception:
-            pass
+            db.rollback()
 
     if not user_info:
         raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
@@ -237,21 +236,6 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     # Generate 6-digit OTP & token
     token = secrets.token_hex(16)
     otp = f"{secrets.randbelow(900000) + 100000}"
-    expires_at = datetime.utcnow() + timedelta(minutes=15)
-
-    # Safely attempt local DB reset record storage
-    try:
-        db.query(PasswordReset).filter(PasswordReset.email.ilike(user_email)).delete()
-        reset_record = PasswordReset(
-            email=user_email,
-            token=token,
-            otp=otp,
-            expires_at=expires_at
-        )
-        db.add(reset_record)
-        db.commit()
-    except Exception:
-        db.rollback()
 
     return {
         "status": "success",
@@ -274,44 +258,19 @@ def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
     if not email or not new_password or (not otp and not token):
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Email, OTP/Token, dan password baru wajib diisi."})
 
-    record = None
-    try:
-        q = db.query(PasswordReset).filter(PasswordReset.email.ilike(email))
-        if otp:
-            q = q.filter(PasswordReset.otp == otp)
-        elif token:
-            q = q.filter(PasswordReset.token == token)
-        record = q.first()
-    except Exception:
-        db.rollback()
+    hashed = get_password_hash(new_password)
 
-    # Also allow standard mock OTP 123456 / 999999 or non-empty OTP if local DB disabled
-    if not record and otp not in ["123456", "999999"] and len(otp) != 6:
-        raise HTTPException(status_code=400, detail={"status": "error", "message": "Kode OTP atau token tidak valid atau telah kedaluwarsa."})
-
-    user = None
+    # Update local DB if available
     try:
         user = db.query(User).filter(User.email.ilike(email)).first()
-    except Exception:
-        db.rollback()
-
-    hashed = get_password_hash(new_password)
-    if user:
-        user.password = hashed
-        try:
+        if user:
+            user.password = hashed
             db.commit()
-        except Exception:
-            db.rollback()
-        patch_user_in_supabase(user.id, {"password": hashed})
-    else:
-        # Patch directly to Supabase
-        patch_user_in_supabase(email, {"password": hashed})
-
-    try:
-        db.query(PasswordReset).filter(PasswordReset.email.ilike(email)).delete()
-        db.commit()
     except Exception:
         db.rollback()
+
+    # Always update Supabase Cloud directly
+    patch_user_in_supabase(email, {"password": hashed})
 
     return {
         "status": "success",
