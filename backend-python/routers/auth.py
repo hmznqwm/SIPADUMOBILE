@@ -191,7 +191,7 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 
 @router.post("/forgot_password")
 @router.post("/forgot_password.php")
-def forgot_password(req: dict = None, db: Session = Depends(get_db)):
+async def forgot_password(req: dict = None):
     try:
         if req is None:
             req = {}
@@ -204,7 +204,6 @@ def forgot_password(req: dict = None, db: Session = Depends(get_db)):
                 detail={"status": "error", "message": "Email wajib diisi."}
             )
 
-        # 1. Query Supabase REST API directly first (fastest and serverless native)
         user_id = None
         user_nama = None
         user_email = None
@@ -222,17 +221,6 @@ def forgot_password(req: dict = None, db: Session = Depends(get_db)):
                 user_email = str(sb_u.get("email") or "")
         except Exception:
             pass
-
-        # 2. Fallback to local DB if available
-        if not user_email and db is not None:
-            try:
-                user = db.query(User).filter(User.email.ilike(email)).first()
-                if user:
-                    user_id = str(user.id)
-                    user_nama = str(user.nama)
-                    user_email = str(user.email)
-            except Exception:
-                pass
 
         if not user_email:
             raise HTTPException(
@@ -269,7 +257,7 @@ def forgot_password(req: dict = None, db: Session = Depends(get_db)):
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
-def reset_password(req: dict = None, db: Session = Depends(get_db)):
+async def reset_password(req: dict = None):
     try:
         if req is None:
             req = {}
@@ -282,16 +270,6 @@ def reset_password(req: dict = None, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail={"status": "error", "message": "Email, OTP/Token, dan password baru wajib diisi."})
 
         hashed = get_password_hash(new_password)
-
-        # Update local DB if available
-        if db is not None:
-            try:
-                user = db.query(User).filter(User.email.ilike(email)).first()
-                if user:
-                    user.password = hashed
-                    db.commit()
-            except Exception:
-                pass
 
         # Always update Supabase Cloud directly
         patch_user_in_supabase(email, {"password": hashed})
