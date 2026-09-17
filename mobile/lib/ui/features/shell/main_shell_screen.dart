@@ -235,9 +235,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
         ),
         child: SafeArea(
           top: false,
-          bottom: true,
+          bottom: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.center,
