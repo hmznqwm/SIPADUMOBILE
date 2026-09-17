@@ -192,33 +192,21 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 @router.post("/forgot_password")
 @router.post("/forgot_password.php")
 def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    email = (req.email or "").strip()
-    nidn = (req.nidn or req.nid or req.nip or "").strip()
+    try:
+        email = (req.email or "").strip()
+        nidn = (req.nidn or req.nid or req.nip or "").strip()
 
-    if not email:
-        raise HTTPException(
-            status_code=400,
-            detail={"status": "error", "message": "Email wajib diisi."}
-        )
+        if not email:
+            raise HTTPException(
+                status_code=400,
+                detail={"status": "error", "message": "Email wajib diisi."}
+            )
 
-    # 1. Cari user dari database lokal/ORM dulu (sama seperti login)
-    user = None
-    if db is not None:
-        try:
-            user = db.query(User).filter(User.email.ilike(email)).first()
-        except Exception:
-            pass
+        # 1. Query Supabase REST API directly first (fastest and serverless native)
+        user_id = None
+        user_nama = None
+        user_email = None
 
-    # 2. Jika tidak ada di lokal, cari dari Supabase REST API
-    user_id = None
-    user_nama = None
-    user_email = None
-
-    if user:
-        user_id = str(user.id)
-        user_nama = str(user.nama)
-        user_email = str(user.email)
-    else:
         try:
             r = requests.get(
                 f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=*",
@@ -227,36 +215,55 @@ def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
             )
             if r.status_code == 200 and r.json():
                 sb_u = r.json()[0]
-                user_id = str(sb_u["id"])
-                user_nama = str(sb_u["nama"])
-                user_email = str(sb_u["email"])
+                user_id = str(sb_u.get("id") or "")
+                user_nama = str(sb_u.get("nama") or "")
+                user_email = str(sb_u.get("email") or "")
         except Exception:
             pass
 
-    if not user_email:
+        # 2. Fallback to local DB if available
+        if not user_email and db is not None:
+            try:
+                user = db.query(User).filter(User.email.ilike(email)).first()
+                if user:
+                    user_id = str(user.id)
+                    user_nama = str(user.nama)
+                    user_email = str(user.email)
+            except Exception:
+                pass
+
+        if not user_email:
+            raise HTTPException(
+                status_code=400,
+                detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."}
+            )
+
+        if nidn and user_id and user_id.lower() != nidn.lower():
+            raise HTTPException(
+                status_code=400,
+                detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
+            )
+
+        import random
+        token = f"tok_{random.randint(10000000, 99999999)}"
+        otp = f"{random.randint(100000, 999999)}"
+
+        return {
+            "status": "success",
+            "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
+            "token": token,
+            "otp": otp,
+            "email": user_email,
+            "nama": user_nama,
+            "nidn": user_id
+        }
+    except HTTPException:
+        raise
+    except Exception as err:
         raise HTTPException(
             status_code=400,
-            detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."}
+            detail={"status": "error", "message": f"Gagal memproses lupa password: {str(err)}"}
         )
-
-    if nidn and user_id and user_id.lower() != nidn.lower():
-        raise HTTPException(
-            status_code=400,
-            detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
-        )
-
-    token = secrets.token_hex(16)
-    otp = f"{secrets.randbelow(900000) + 100000}"
-
-    return {
-        "status": "success",
-        "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
-        "token": token,
-        "otp": otp,
-        "email": user_email,
-        "nama": user_nama,
-        "nidn": user_id
-    }
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
