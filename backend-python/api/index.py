@@ -13,10 +13,11 @@ from core.database import Base, engine
 from routers import auth, master, availability, ajuan, schedule, engine as engine_router, notifications, seed
 
 # Auto create tables if running on SQLite or fresh DB
-try:
-    Base.metadata.create_all(bind=engine)
-except Exception as e:
-    print(f"Warning on metadata create: {e}")
+if not os.getenv("VERCEL") and not os.getenv("VERCEL_ENV"):
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Warning on metadata create: {e}")
 
 app = FastAPI(
     title="SmartSchedule API (Python FastAPI)",
