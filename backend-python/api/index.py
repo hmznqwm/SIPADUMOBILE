@@ -64,6 +64,8 @@ app.include_router(seed.router)
 
 @app.on_event("startup")
 def startup_sync_from_supabase_cloud():
+    if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
+        return
     try:
         from core.database import SessionLocal
         from routers.engine import sync_supabase_to_sqlite_for_csp
