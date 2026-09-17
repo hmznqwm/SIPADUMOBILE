@@ -27,6 +27,7 @@ SUPABASE_KEY = settings.SUPABASE_KEY
 SB_HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
+    "User-Agent": "SmartScheduleBackend/1.0"
 }
 
