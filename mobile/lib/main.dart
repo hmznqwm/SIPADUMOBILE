@@ -26,10 +26,24 @@ import 'ui/features/onboarding/views/onboarding_screen.dart';
 import 'ui/features/schedule/view_models/schedule_view_model.dart';
 import 'ui/features/shell/main_shell_screen.dart';
 
+import 'package:flutter/services.dart';
+
 /// Fungsi utama untuk menjalankan aplikasi Flutter
 void main() {
   // Memastikan binding Flutter sudah siap sebelum menjalankan aplikasi
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Mengatur transparansi dan warna sistem navigation bar Android agar tidak menutupi tombol navbar
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarDividerColor: Colors.transparent,
+    ),
+  );
+
   runApp(const SmartScheduleApp());
 }
 

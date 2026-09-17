@@ -69,8 +69,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeInOutCubic,
         padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 14 : 10,
-          vertical: 8,
+          horizontal: isSelected ? 12 : 8,
+          vertical: 6,
         ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent,
@@ -235,9 +235,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
         ),
         child: SafeArea(
           top: false,
-          child: Container(
-            height: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+          bottom: true,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.center,
