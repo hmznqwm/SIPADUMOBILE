@@ -4,6 +4,59 @@ from typing import Optional, List
 from core.database import get_db
 from models.models import Notification
 import secrets
+import requests
+
+from core.config import SUPABASE_URL, SB_HEADERS
+
+def sync_notification_to_supabase(n: Notification):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/notifications"
+        payload = {
+            "id": n.id,
+            "user_id": n.user_id,
+            "title": n.title,
+            "message": n.message,
+            "type": n.type,
+            "is_read": bool(n.is_read)
+        }
+        requests.post(url, headers=SB_HEADERS, json=payload, timeout=5)
+    except Exception:
+        pass
+
+def delete_notifications_from_supabase(del_ids: List[str]):
+    try:
+        for nid in del_ids:
+            url = f"{SUPABASE_URL}/rest/v1/notifications?id=eq.{nid}"
+            requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
+    except Exception:
+        pass
+
+def update_read_in_supabase(ids: List[str], is_read: bool):
+    try:
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json"
+        }
+        for nid in ids:
+            url = f"{SUPABASE_URL}/rest/v1/notifications?id=eq.{nid}"
+            requests.patch(url, headers=headers, json={"is_read": is_read}, timeout=5)
+    except Exception:
+        pass
+
+def mark_all_read_in_supabase(uid: Optional[str]):
+    try:
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json"
+        }
+        url = f"{SUPABASE_URL}/rest/v1/notifications"
+        if uid:
+            url += f"?user_id=eq.{uid}"
+        requests.patch(url, headers=headers, json={"is_read": True}, timeout=5)
+    except Exception:
+        pass
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
@@ -65,6 +118,7 @@ async def handle_notif_action(request: Request, db: Session = Depends(get_db)):
         if del_ids:
             db.query(Notification).filter(Notification.id.in_(del_ids)).delete(synchronize_session=False)
             db.commit()
+            delete_notifications_from_supabase(del_ids)
         return {"status": "success", "message": "Notifikasi berhasil dihapus."}
 
     # 2. Mark All Read
@@ -80,12 +134,14 @@ async def handle_notif_action(request: Request, db: Session = Depends(get_db)):
             )
         q.update({"is_read": True}, synchronize_session=False)
         db.commit()
+        mark_all_read_in_supabase(uid)
         return {"status": "success", "message": "Semua notifikasi ditandai telah dibaca."}
 
     # 3. Mark Multiple Read/Unread
     if ids and isinstance(ids, list):
         db.query(Notification).filter(Notification.id.in_(ids)).update({"is_read": is_read_val}, synchronize_session=False)
         db.commit()
+        update_read_in_supabase(ids, is_read_val)
         return {"status": "success", "message": "Daftar notifikasi diperbarui."}
 
     # 4. Mark Single Read/Unread
@@ -94,6 +150,7 @@ async def handle_notif_action(request: Request, db: Session = Depends(get_db)):
         if n:
             n.is_read = is_read_val
             db.commit()
+            update_read_in_supabase([nid], is_read_val)
         return {"status": "success", "message": "Status notifikasi diperbarui."}
 
     # 5. Create new notification
@@ -110,6 +167,7 @@ async def handle_notif_action(request: Request, db: Session = Depends(get_db)):
         )
         db.add(new_n)
         db.commit()
+        sync_notification_to_supabase(new_n)
         return {"status": "success", "message": "Notifikasi berhasil dibuat.", "data": format_notif(new_n)}
 
     return {"status": "success"}
@@ -127,4 +185,5 @@ async def delete_notification(request: Request, id: Optional[str] = Query(None),
     if del_ids:
         db.query(Notification).filter(Notification.id.in_(del_ids)).delete(synchronize_session=False)
         db.commit()
+        delete_notifications_from_supabase(del_ids)
     return {"status": "success", "message": "Notifikasi berhasil dihapus."}

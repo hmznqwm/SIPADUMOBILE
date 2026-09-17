@@ -3,7 +3,32 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from core.database import get_db
 from models.models import Availability, AvailabilitySlot, SlotWaktu, User, Setting
+from datetime import datetime
 import secrets
+import requests
+
+from core.config import SUPABASE_URL, SB_HEADERS
+
+def sync_availability_to_supabase(avail_id: str, dosen_id: str, semester_id: str, status: str, slot_ids: list):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/availability"
+        payload = {
+            "id": avail_id,
+            "dosen_id": dosen_id,
+            "semester_id": semester_id,
+            "status": status,
+            "submitted_at": datetime.utcnow().isoformat()
+        }
+        requests.post(url, headers=SB_HEADERS, json=payload, timeout=5)
+        # Delete old slots and insert new
+        del_url = f"{SUPABASE_URL}/rest/v1/availability_slots?availability_id=eq.{avail_id}"
+        requests.delete(del_url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
+        if slot_ids:
+            slot_url = f"{SUPABASE_URL}/rest/v1/availability_slots"
+            slots_payload = [{"availability_id": avail_id, "slot_id": str(sid)} for sid in slot_ids]
+            requests.post(slot_url, headers=SB_HEADERS, json=slots_payload, timeout=5)
+    except Exception:
+        pass
 
 router = APIRouter(prefix="/availability", tags=["Availability"])
 
@@ -86,6 +111,7 @@ async def submit_availability(request: Request, db: Session = Depends(get_db)):
         db.add(AvailabilitySlot(availability_id=avail.id, slot_id=s_id))
 
     db.commit()
+    sync_availability_to_supabase(avail.id, dosen_id, semester_id, avail.status, slot_ids)
     return {"status": "success", "message": "Ketersediaan waktu dosen berhasil disimpan."}
 
 # ─── STATUS WINDOW SAKELAR ─────────────────────────────────────────────
@@ -116,6 +142,18 @@ async def set_submission_window_status(request: Request, db: Session = Depends(g
     db.commit()
     return {"status": "success", "isActive": bool(active_val), "is_active": bool(active_val)}
 
+def patch_availability_status_in_supabase(dosen_id: str, new_status: str):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/availability?dosen_id=eq.{dosen_id}"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json"
+        }
+        requests.patch(url, headers=headers, json={"status": new_status}, timeout=5)
+    except Exception:
+        pass
+
 # ─── MULTI-TIER VERIFIKASI AVAILABILITY ────────────────────────────────
 @router.post("/verify")
 @router.post("/verify.php")
@@ -124,8 +162,10 @@ async def verify_availability(request: Request, db: Session = Depends(get_db)):
     action = body.get("action", "")
 
     if action == "verify_kajur" and body.get("dosenId"):
-        db.query(Availability).filter(Availability.dosen_id == body["dosenId"]).update({"status": "verified_kajur"})
+        d_id = body["dosenId"]
+        db.query(Availability).filter(Availability.dosen_id == d_id).update({"status": "verified_kajur"})
         db.commit()
+        patch_availability_status_in_supabase(d_id, "verified_kajur")
         return {"status": "success", "message": "Ajuan dosen berhasil diverifikasi KaProdi"}
 
     if action == "approve_dekan" and body.get("fakultasNama"):
@@ -133,6 +173,8 @@ async def verify_availability(request: Request, db: Session = Depends(get_db)):
         if dosen_ids:
             db.query(Availability).filter(Availability.dosen_id.in_(dosen_ids)).update({"status": "approved_dekan"}, synchronize_session=False)
             db.commit()
+            for did in dosen_ids:
+                patch_availability_status_in_supabase(did, "approved_dekan")
         return {"status": "success", "message": "Seluruh ajuan fakultas disetujui Dekan"}
 
     return {"status": "success"}

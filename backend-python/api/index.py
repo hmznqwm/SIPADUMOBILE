@@ -33,6 +33,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
+
 # Mount all API routers under both /api and root / for maximum compatibility
 app.include_router(auth.router, prefix="/api")
 app.include_router(master.router, prefix="/api")
@@ -52,6 +61,18 @@ app.include_router(schedule.router)
 app.include_router(engine_router.router)
 app.include_router(notifications.router)
 app.include_router(seed.router)
+
+@app.on_event("startup")
+def startup_sync_from_supabase_cloud():
+    try:
+        from core.database import SessionLocal
+        from routers.engine import sync_supabase_to_sqlite_for_csp
+        db = SessionLocal()
+        sync_supabase_to_sqlite_for_csp(db)
+        db.close()
+        print("[SUPABASE CLOUD SYNC] Successfully loaded 100% online state from Supabase Cloud Database.")
+    except Exception as err:
+        print(f"[SUPABASE CLOUD SYNC WARNING] {err}")
 
 @app.get("/")
 @app.get("/api")

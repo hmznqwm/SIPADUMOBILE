@@ -74,6 +74,8 @@ def run_seed(db: Session = Depends(get_db)):
             # FKIK
             User(id="DOS014", nama="Apt. Eko Suhartono, M.Sc.", email="eko.suhartono@uin-malang.ac.id", password=default_pw, role="dosen", fakultas_nama="Fakultas Kedokteran dan Ilmu Kesehatan", jurusan_nama="Farmasi", is_priority=True),
         ]
+        for u in users:
+            u.password = hash_pw(u.id)
         db.add_all(users)
 
         # 2. GEDUNG PERKULIAHAN UIN MALANG

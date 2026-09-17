@@ -5,6 +5,75 @@ from datetime import datetime
 from core.database import get_db
 from models.models import AjuanPengajaran, User, JadwalFinal
 import secrets
+import requests
+
+from core.config import SUPABASE_URL, SB_HEADERS
+
+def sync_ajuan_to_supabase(a: AjuanPengajaran):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/ajuan_pengajaran"
+        payload = {
+            "id": a.id,
+            "dosen_id": a.dosen_id,
+            "dosen_nama": a.dosen_nama,
+            "fakultas_nama": a.fakultas_nama,
+            "jurusan_nama": a.jurusan_nama,
+            "mata_kuliah_id": a.mata_kuliah_id,
+            "mata_kuliah_nama": a.mata_kuliah_nama,
+            "sks": a.sks,
+            "semester": a.semester,
+            "kelas_nama": a.kelas_nama,
+            "jumlah_mahasiswa": a.jumlah_mahasiswa,
+            "gedung_nama": a.gedung_nama,
+            "ruangan_nama": a.ruangan_nama,
+            "hari": a.hari,
+            "jam_mulai": a.jam_mulai,
+            "jam_selesai": a.jam_selesai,
+            "status": a.status,
+            "catatan_dosen": a.catatan_dosen,
+            "catatan_kaprodi": a.catatan_kaprodi,
+            "catatan_dekan": a.catatan_dekan,
+            "catatan_admin": a.catatan_admin,
+            "alasan_penolakan": a.alasan_penolakan,
+            "alasan_banding": a.alasan_banding,
+            "preferensi_banding_hari": a.preferensi_banding_hari,
+            "preferensi_banding_jam": a.preferensi_banding_jam,
+            "bentrok_detail": a.bentrok_detail,
+        }
+        requests.post(url, headers=SB_HEADERS, json=payload, timeout=5)
+    except Exception:
+        pass
+
+def delete_ajuan_from_supabase(aid: str):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/ajuan_pengajaran?id=eq.{aid}"
+        requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
+    except Exception:
+        pass
+
+def sync_jadwal_to_supabase(j: JadwalFinal):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/jadwal_final"
+        payload = {
+            "id": j.id,
+            "mata_kuliah_id": j.mata_kuliah_id,
+            "mata_kuliah_nama": j.mata_kuliah_nama,
+            "sks": j.sks,
+            "ruangan_nama": j.ruangan_nama,
+            "gedung_nama": j.gedung_nama,
+            "kelas_nama": j.kelas_nama,
+            "hari": j.hari,
+            "jam_mulai": j.jam_mulai,
+            "jam_selesai": j.jam_selesai,
+            "dosen_id": j.dosen_id,
+            "dosen_nama": j.dosen_nama,
+            "fakultas_nama": j.fakultas_nama,
+            "jurusan_nama": j.jurusan_nama,
+            "jumlah_mahasiswa": j.jumlah_mahasiswa
+        }
+        requests.post(url, headers=SB_HEADERS, json=payload, timeout=5)
+    except Exception:
+        pass
 
 router = APIRouter(prefix="/ajuan", tags=["Ajuan Pengajaran"])
 
@@ -124,6 +193,7 @@ async def submit_ajuan(request: Request, db: Session = Depends(get_db)):
     )
     db.add(ajuan)
     db.commit()
+    sync_ajuan_to_supabase(ajuan)
     return {"status": "success", "message": "Ajuan pengajaran berhasil dikirim ke KaProdi.", "data": format_ajuan(ajuan)}
 
 # ─── VERIFIKASI MULTI-TIER (KAPRODI, DEKAN, ADMIN) ─────────────────────
@@ -157,6 +227,7 @@ async def verify_ajuan_endpoint(request: Request, db: Session = Depends(get_db))
         if catatan:
             ajuan.catatan_kaprodi = catatan
         db.commit()
+        sync_ajuan_to_supabase(ajuan)
         return {"status": "success", "message": "Ajuan berhasil diverifikasi oleh KaProdi.", "data": format_ajuan(ajuan)}
 
     elif action in ["approve_dekan", "dekan_approve"]:
@@ -184,6 +255,8 @@ async def verify_ajuan_endpoint(request: Request, db: Session = Depends(get_db))
         )
         db.add(jadwal)
         db.commit()
+        sync_ajuan_to_supabase(ajuan)
+        sync_jadwal_to_supabase(jadwal)
         return {"status": "success", "message": "Ajuan disetujui Dekan dan dimasukkan ke Jadwal Final.", "data": format_ajuan(ajuan)}
 
     elif action in ["reject_kaprodi", "reject_dekan", "reject"]:
@@ -191,6 +264,7 @@ async def verify_ajuan_endpoint(request: Request, db: Session = Depends(get_db))
         if alasan:
             ajuan.alasan_penolakan = alasan
         db.commit()
+        sync_ajuan_to_supabase(ajuan)
         return {"status": "success", "message": "Ajuan telah ditolak.", "data": format_ajuan(ajuan)}
 
     elif action in ["admin_resolve", "resolve"]:
@@ -216,6 +290,8 @@ async def verify_ajuan_endpoint(request: Request, db: Session = Depends(get_db))
         )
         db.add(jadwal)
         db.commit()
+        sync_ajuan_to_supabase(ajuan)
+        sync_jadwal_to_supabase(jadwal)
         return {"status": "success", "message": "Ajuan berhasil diselesaikan oleh Admin.", "data": format_ajuan(ajuan)}
 
     db.commit()

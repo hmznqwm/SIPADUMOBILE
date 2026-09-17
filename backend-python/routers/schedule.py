@@ -4,6 +4,40 @@ from typing import Optional
 from core.database import get_db
 from models.models import JadwalFinal, AjuanPengajaran
 import secrets
+import requests
+
+from core.config import SUPABASE_URL, SB_HEADERS
+
+def sync_jadwal_to_supabase(j: JadwalFinal):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/jadwal_final"
+        payload = {
+            "id": j.id,
+            "mata_kuliah_id": j.mata_kuliah_id,
+            "mata_kuliah_nama": j.mata_kuliah_nama,
+            "sks": j.sks,
+            "ruangan_nama": j.ruangan_nama,
+            "gedung_nama": j.gedung_nama,
+            "kelas_nama": j.kelas_nama,
+            "hari": j.hari,
+            "jam_mulai": j.jam_mulai,
+            "jam_selesai": j.jam_selesai,
+            "dosen_id": j.dosen_id,
+            "dosen_nama": j.dosen_nama,
+            "fakultas_nama": j.fakultas_nama,
+            "jurusan_nama": j.jurusan_nama,
+            "jumlah_mahasiswa": j.jumlah_mahasiswa
+        }
+        requests.post(url, headers=SB_HEADERS, json=payload, timeout=5)
+    except Exception:
+        pass
+
+def delete_jadwal_from_supabase(jid: str):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/jadwal_final?id=eq.{jid}"
+        requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
+    except Exception:
+        pass
 
 router = APIRouter(prefix="/schedule", tags=["Schedule"])
 
@@ -97,6 +131,66 @@ def get_schedules(
     did = dosenId or dosen_id
     jur = jurusan or prodi
 
+    # Sinkronisasi jadwal_final dari Supabase Cloud agar data selalu fresh
+    try:
+        r_j = requests.get(f"{SUPABASE_URL}/rest/v1/jadwal_final?select=*", headers=SB_HEADERS, timeout=6)
+        if r_j.status_code == 200:
+            existing_jdw = {j.id: j for j in db.query(JadwalFinal).all()}
+            for jd in r_j.json():
+                ex = existing_jdw.get(jd["id"])
+                if not ex:
+                    ex = JadwalFinal(id=jd["id"])
+                    db.add(ex)
+                    existing_jdw[jd["id"]] = ex
+                ex.mata_kuliah_id = jd.get("mata_kuliah_id")
+                ex.mata_kuliah_nama = jd.get("mata_kuliah_nama")
+                ex.sks = int(jd.get("sks", 3))
+                ex.ruangan_nama = jd.get("ruangan_nama")
+                ex.gedung_nama = jd.get("gedung_nama")
+                ex.kelas_nama = jd.get("kelas_nama")
+                ex.hari = jd.get("hari")
+                ex.jam_mulai = jd.get("jam_mulai")
+                ex.jam_selesai = jd.get("jam_selesai")
+                ex.dosen_id = jd.get("dosen_id")
+                ex.dosen_nama = jd.get("dosen_nama")
+                ex.fakultas_nama = jd.get("fakultas_nama")
+                ex.jurusan_nama = jd.get("jurusan_nama")
+                ex.jumlah_mahasiswa = int(jd.get("jumlah_mahasiswa", 35))
+            db.commit()
+    except Exception:
+        pass
+
+    # Sinkronisasi ajuan_pengajaran dari Supabase juga
+    try:
+        r_a = requests.get(f"{SUPABASE_URL}/rest/v1/ajuan_pengajaran?select=*", headers=SB_HEADERS, timeout=6)
+        if r_a.status_code == 200:
+            existing_aj = {a.id: a for a in db.query(AjuanPengajaran).all()}
+            for ad in r_a.json():
+                ex_a = existing_aj.get(ad["id"])
+                if not ex_a:
+                    ex_a = AjuanPengajaran(id=ad["id"])
+                    db.add(ex_a)
+                    existing_aj[ad["id"]] = ex_a
+                ex_a.dosen_id = ad.get("dosen_id")
+                ex_a.dosen_nama = ad.get("dosen_nama")
+                ex_a.fakultas_nama = ad.get("fakultas_nama")
+                ex_a.jurusan_nama = ad.get("jurusan_nama")
+                ex_a.mata_kuliah_id = ad.get("mata_kuliah_id")
+                ex_a.mata_kuliah_nama = ad.get("mata_kuliah_nama")
+                ex_a.sks = int(ad.get("sks", 3))
+                ex_a.semester = int(ad.get("semester", 1))
+                ex_a.kelas_nama = ad.get("kelas_nama")
+                ex_a.jumlah_mahasiswa = int(ad.get("jumlah_mahasiswa", 35))
+                ex_a.gedung_nama = ad.get("gedung_nama")
+                ex_a.ruangan_nama = ad.get("ruangan_nama")
+                ex_a.hari = ad.get("hari", "Senin")
+                ex_a.jam_mulai = ad.get("jam_mulai", "07:30")
+                ex_a.jam_selesai = ad.get("jam_selesai", "10:00")
+                ex_a.status = ad.get("status", "diajukan")
+            db.commit()
+    except Exception:
+        pass
+
     # 1. Fetch official final schedules
     q = db.query(JadwalFinal)
     if did and did != "GLOBAL":
@@ -147,6 +241,7 @@ async def create_schedule(request: Request, db: Session = Depends(get_db)):
         if jadwal:
             db.delete(jadwal)
             db.commit()
+            delete_jadwal_from_supabase(jid)
         return {"status": "success", "message": "Jadwal berhasil dihapus"}
 
     jid = jid or f"SCH_{secrets.token_hex(4).upper()}"
@@ -169,6 +264,7 @@ async def create_schedule(request: Request, db: Session = Depends(get_db)):
     )
     db.add(jadwal)
     db.commit()
+    sync_jadwal_to_supabase(jadwal)
     return {"status": "success", "message": "Jadwal berhasil ditambahkan", "data": format_jadwal(jadwal)}
 
 @router.delete("")
@@ -179,4 +275,5 @@ def delete_schedule(id: str = Query(...), db: Session = Depends(get_db)):
     if jadwal:
         db.delete(jadwal)
         db.commit()
+        delete_jadwal_from_supabase(id)
     return {"status": "success", "message": "Jadwal berhasil dihapus"}

@@ -4,6 +4,78 @@ from typing import Optional, List, Dict, Any
 from core.database import get_db
 from models.models import Gedung, Ruangan, MataKuliah, MataKuliahKelas, SlotWaktu, User, AjuanPengajaran, JadwalFinal
 import bcrypt
+import requests
+import secrets
+
+from core.config import SUPABASE_URL, SB_HEADERS
+
+def sync_user_to_supabase(user_data: dict):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/users"
+        requests.post(url, headers=SB_HEADERS, json=user_data, timeout=5)
+    except Exception:
+        pass
+
+def delete_user_from_supabase(user_id: str):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/users?id=eq.{user_id}"
+        requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
+    except Exception:
+        pass
+
+def patch_user_priority_in_supabase(user_id: str, priority: bool):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/users?id=eq.{user_id}"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json"
+        }
+        requests.patch(url, headers=headers, json={"is_priority": priority}, timeout=5)
+    except Exception:
+        pass
+
+def sync_gedung_to_supabase(gedung_data: dict):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/gedung"
+        requests.post(url, headers=SB_HEADERS, json=gedung_data, timeout=5)
+    except Exception:
+        pass
+
+def delete_gedung_from_supabase(gedung_id: str):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/gedung?id=eq.{gedung_id}"
+        requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
+    except Exception:
+        pass
+
+def sync_ruangan_to_supabase(ruangan_data: dict):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/ruangan"
+        requests.post(url, headers=SB_HEADERS, json=ruangan_data, timeout=5)
+    except Exception:
+        pass
+
+def delete_ruangan_from_supabase(ruangan_id: str):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/ruangan?id=eq.{ruangan_id}"
+        requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
+    except Exception:
+        pass
+
+def sync_matkul_to_supabase(matkul_data: dict):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/mata_kuliah"
+        requests.post(url, headers=SB_HEADERS, json=matkul_data, timeout=5)
+    except Exception:
+        pass
+
+def delete_matkul_from_supabase(matkul_id: str):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/mata_kuliah?id=eq.{matkul_id}"
+        requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
+    except Exception:
+        pass
 
 router = APIRouter(prefix="/master", tags=["Master Data"])
 
@@ -54,6 +126,7 @@ async def create_or_update_gedung(request: Request, db: Session = Depends(get_db
             ).delete(synchronize_session=False)
             db.delete(gedung)
             db.commit()
+            delete_gedung_from_supabase(gid)
         return {"status": "success", "message": "Gedung dan jadwal/ruangan terkait berhasil dihapus"}
 
     if not gid or not body.get("nama"):
@@ -75,6 +148,13 @@ async def create_or_update_gedung(request: Request, db: Session = Depends(get_db
         )
         db.add(gedung)
     db.commit()
+    sync_gedung_to_supabase({
+        "id": gedung.id,
+        "nama": gedung.nama,
+        "jam_buka": gedung.jam_buka,
+        "jam_tutup": gedung.jam_tutup,
+        "akses_jurusan": gedung.akses_jurusan
+    })
     return {"status": "success", "message": "Data gedung berhasil disimpan"}
 
 @router.delete("/gedung")
@@ -95,6 +175,7 @@ def delete_gedung(id: str = Query(...), db: Session = Depends(get_db)):
         ).delete(synchronize_session=False)
         db.delete(gedung)
         db.commit()
+        delete_gedung_from_supabase(id)
     return {"status": "success", "message": "Gedung dan jadwal/ruangan terkait berhasil dihapus"}
 
 # ─── RUANGAN ────────────────────────────────────────────────────────────
@@ -140,6 +221,7 @@ async def create_or_update_ruangan(request: Request, db: Session = Depends(get_d
             db.query(AjuanPengajaran).filter(AjuanPengajaran.ruangan_nama == r_nama).delete(synchronize_session=False)
             db.delete(ruangan)
             db.commit()
+            delete_ruangan_from_supabase(rid)
         return {"status": "success", "message": "Ruangan dan jadwal terkait berhasil dihapus"}
 
     gid_raw = body.get("gedung_id") or body.get("gedungId") or body.get("gedung_nama") or body.get("gedungNama")
@@ -172,6 +254,16 @@ async def create_or_update_ruangan(request: Request, db: Session = Depends(get_d
         )
         db.add(ruangan)
     db.commit()
+    sync_ruangan_to_supabase({
+        "id": ruangan.id,
+        "nama": ruangan.nama,
+        "gedung_id": ruangan.gedung_id,
+        "lantai": ruangan.lantai,
+        "kapasitas": ruangan.kapasitas,
+        "tipe_ruangan": ruangan.tipe_ruangan,
+        "status": ruangan.status,
+        "keterangan": ruangan.keterangan
+    })
     return {"status": "success", "message": "Data ruangan berhasil disimpan"}
 
 @router.delete("/ruangan")
@@ -184,6 +276,7 @@ def delete_ruangan(id: str = Query(...), db: Session = Depends(get_db)):
         db.query(AjuanPengajaran).filter(AjuanPengajaran.ruangan_nama == r_nama).delete(synchronize_session=False)
         db.delete(ruangan)
         db.commit()
+        delete_ruangan_from_supabase(id)
     return {"status": "success", "message": "Ruangan dan jadwal terkait berhasil dihapus"}
 
 # ─── MATA KULIAH ────────────────────────────────────────────────────────
@@ -199,42 +292,107 @@ def get_mata_kuliah(dosen_id: Optional[str] = None, dosenId: Optional[str] = Non
     items = q.all()
     
     if not items and did:
-        ajuan_items = db.query(AjuanPengajaran).filter(AjuanPengajaran.dosen_id == did).all()
-        seen = set()
-        data = []
-        for a in ajuan_items:
-            if a.mata_kuliah_id in seen:
-                continue
-            seen.add(a.mata_kuliah_id)
-            kelas_list = [a.kelas_nama] if a.kelas_nama else ["TI-1A"]
-            kelas_ids = [f"{a.mata_kuliah_id}_KLS_{i+1}" for i in range(len(kelas_list))]
-            data.append({
-                "id": a.mata_kuliah_id,
-                "nama": a.mata_kuliah_nama,
-                "sks": a.sks,
-                "jurusanId": "JUR001",
-                "jurusan_id": "JUR001",
-                "jurusanNama": a.jurusan_nama,
-                "jurusan_nama": a.jurusan_nama,
-                "fakultasNama": a.fakultas_nama,
-                "fakultas_nama": a.fakultas_nama,
-                "dosenId": a.dosen_id,
-                "dosen_id": a.dosen_id,
-                "dosenNama": a.dosen_nama,
-                "dosen_nama": a.dosen_nama,
-                "semesterId": "SEM001",
-                "semester_id": "SEM001",
-                "semesterAngka": a.semester,
-                "semester_angka": a.semester,
-                "kebutuhanTipeRuangan": "Kelas Teori",
-                "kebutuhan_tipe_ruangan": "Kelas Teori",
-                "kelasIds": kelas_ids,
-                "kelas_ids": kelas_ids,
-                "kelasNama": kelas_list,
-                "kelas_nama": kelas_list,
-                "kelas": kelas_list
-            })
-        return {"status": "success", "data": data}
+        # 1. Check user's assigned matkul_nama in User master record
+        user = db.query(User).filter((User.id == did) | (User.email == did)).first()
+        if not user or not user.matkul_nama:
+            try:
+                r_sb = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/users?or=(id.eq.{did},email.ilike.{did})&select=*",
+                    headers=SB_HEADERS,
+                    timeout=5
+                )
+                if r_sb.status_code == 200 and r_sb.json():
+                    sb_u = r_sb.json()[0]
+                    if not user:
+                        user = User(
+                            id=sb_u["id"],
+                            nama=sb_u["nama"],
+                            email=sb_u["email"],
+                            password=sb_u.get("password") or "password123",
+                            role=sb_u.get("role") or "dosen",
+                            jurusan_id=sb_u.get("jurusan_id"),
+                            jurusan_nama=sb_u.get("jurusan_nama"),
+                            fakultas_nama=sb_u.get("fakultas_nama"),
+                            matkul_nama=sb_u.get("matkul_nama")
+                        )
+                        db.add(user)
+                    else:
+                        user.matkul_nama = sb_u.get("matkul_nama")
+                    db.commit()
+            except Exception:
+                pass
+
+        if user and user.matkul_nama:
+            for part in user.matkul_nama.split(","):
+                clean = part.strip()
+                if "-" in clean:
+                    clean = clean.split("-")[-1].strip()
+                if clean:
+                    mks = db.query(MataKuliah).filter(MataKuliah.nama.ilike(f"%{clean}%")).all()
+                    if mks:
+                        for mk in mks:
+                            mk.dosen_id = user.id
+                            mk.dosen_nama = user.nama
+                            items.append(mk)
+                        db.commit()
+                    else:
+                        code_part = part.split("-")[0].strip() if "-" in part else f"MK_{user.id}"
+                        new_mk = MataKuliah(
+                            id=f"MK_{secrets.token_hex(4).upper()}",
+                            kode=code_part,
+                            nama=clean,
+                            sks=3,
+                            jurusan_id=user.jurusan_id or "JUR001",
+                            jurusan_nama=user.jurusan_nama or "Teknik Informatika",
+                            fakultas_nama=user.fakultas_nama or "Fakultas Sains & Teknologi",
+                            dosen_id=user.id,
+                            dosen_nama=user.nama,
+                            semester_angka=1,
+                            kebutuhan_tipe_ruangan="Kelas Teori"
+                        )
+                        db.add(new_mk)
+                        db.commit()
+                        items.append(new_mk)
+
+        # 2. Check active ajuan pengajaran for this lecturer
+        if not items:
+            ajuan_items = db.query(AjuanPengajaran).filter(AjuanPengajaran.dosen_id == did).all()
+            seen = set()
+            data = []
+            for a in ajuan_items:
+                if a.mata_kuliah_id in seen:
+                    continue
+                seen.add(a.mata_kuliah_id)
+                kelas_list = [a.kelas_nama] if a.kelas_nama else ["TI-1A"]
+                kelas_ids = [f"{a.mata_kuliah_id}_KLS_{i+1}" for i in range(len(kelas_list))]
+                data.append({
+                    "id": a.mata_kuliah_id,
+                    "nama": a.mata_kuliah_nama,
+                    "sks": a.sks,
+                    "jurusanId": "JUR001",
+                    "jurusan_id": "JUR001",
+                    "jurusanNama": a.jurusan_nama,
+                    "jurusan_nama": a.jurusan_nama,
+                    "fakultasNama": a.fakultas_nama,
+                    "fakultas_nama": a.fakultas_nama,
+                    "dosenId": a.dosen_id,
+                    "dosen_id": a.dosen_id,
+                    "dosenNama": a.dosen_nama,
+                    "dosen_nama": a.dosen_nama,
+                    "semesterId": "SEM001",
+                    "semester_id": "SEM001",
+                    "semesterAngka": a.semester,
+                    "semester_angka": a.semester,
+                    "kebutuhanTipeRuangan": "Kelas Teori",
+                    "kebutuhan_tipe_ruangan": "Kelas Teori",
+                    "kelasIds": kelas_ids,
+                    "kelas_ids": kelas_ids,
+                    "kelasNama": kelas_list,
+                    "kelas_nama": kelas_list,
+                    "kelas": kelas_list
+                })
+            if data:
+                return {"status": "success", "data": data}
 
     data = []
     for mk in items:
@@ -251,7 +409,7 @@ def get_mata_kuliah(dosen_id: Optional[str] = None, dosenId: Optional[str] = Non
             kelasList = [f"{prefix}A", f"{prefix}B"]
 
         kelas_ids = [f"{mk.id}_KLS_{i+1}" for i in range(len(kelasList))]
-        dosen_nama = mk.dosen.nama if mk.dosen else ""
+        dosen_nama = (mk.dosen.nama if mk.dosen else None) or mk.dosen_nama or ""
         data.append({
             "id": mk.id,
             "nama": mk.nama,
@@ -302,6 +460,7 @@ async def create_or_update_mata_kuliah(request: Request, db: Session = Depends(g
             ).delete(synchronize_session=False)
             db.delete(mk)
             db.commit()
+            delete_matkul_from_supabase(mk_id)
         return {"status": "success", "message": "Mata kuliah dan jadwal terkait berhasil dihapus"}
 
     did_raw = body.get("dosen_id") or body.get("dosenId") or body.get("dosen_nama") or body.get("dosenNama")
@@ -323,6 +482,7 @@ async def create_or_update_mata_kuliah(request: Request, db: Session = Depends(g
     mk.jurusan_nama = body.get("jurusan_nama") or body.get("jurusanNama", mk.jurusan_nama or "Teknik Informatika")
     mk.fakultas_nama = body.get("fakultas_nama") or body.get("fakultasNama", mk.fakultas_nama or "Fakultas Sains & Teknologi")
     mk.dosen_id = did
+    mk.dosen_nama = u_obj.nama if u_obj else (body.get("dosen_nama") or body.get("dosenNama") or body.get("dosen") or getattr(mk, 'dosen_nama', None) or "")
     mk.semester_angka = int(body.get("semester_angka") or body.get("semesterAngka", mk.semester_angka or 1))
     mk.kebutuhan_tipe_ruangan = body.get("kebutuhan_tipe_ruangan") or body.get("kebutuhanTipeRuangan", mk.kebutuhan_tipe_ruangan)
 
@@ -334,6 +494,16 @@ async def create_or_update_mata_kuliah(request: Request, db: Session = Depends(g
             db.add(MataKuliahKelas(mata_kuliah_id=mk_id, kelas_nama=str(k)))
 
     db.commit()
+    sync_matkul_to_supabase({
+        "id": mk.id,
+        "nama": mk.nama,
+        "sks": mk.sks,
+        "jurusan_id": mk.jurusan_id,
+        "jurusan_nama": mk.jurusan_nama,
+        "fakultas_nama": mk.fakultas_nama,
+        "dosen_id": mk.dosen_id,
+        "dosen_nama": mk.dosen_nama,
+    })
     return {"status": "success", "message": "Mata kuliah berhasil disimpan"}
 
 @router.delete("/mata_kuliah")
@@ -353,6 +523,7 @@ def delete_mata_kuliah(id: str = Query(...), db: Session = Depends(get_db)):
         ).delete(synchronize_session=False)
         db.delete(mk)
         db.commit()
+        delete_matkul_from_supabase(id)
     return {"status": "success", "message": "Mata kuliah dan jadwal terkait berhasil dihapus"}
 
 # ─── USERS / DOSEN ──────────────────────────────────────────────────────
@@ -378,7 +549,9 @@ def get_users(role: Optional[str] = None, db: Session = Depends(get_db)):
             "isPriority": bool(u.is_priority),
             "is_priority": bool(u.is_priority),
             "avatarUrl": u.avatar_url,
-            "avatar_url": u.avatar_url
+            "avatar_url": u.avatar_url,
+            "matkulNama": u.matkul_nama,
+            "matkul_nama": u.matkul_nama
         }
         for u in items
     ]
@@ -397,6 +570,7 @@ async def create_or_update_user(request: Request, db: Session = Depends(get_db))
             p = bool(body.get("isPriority") if "isPriority" in body else body.get("is_priority"))
             db.query(User).filter(User.id == dId).update({"is_priority": p})
             db.commit()
+            patch_user_priority_in_supabase(dId, p)
             return {"status": "success", "message": "Prioritas dosen berhasil diperbarui"}
 
     # 2. Action delete
@@ -417,6 +591,7 @@ async def create_or_update_user(request: Request, db: Session = Depends(get_db))
             db.query(MataKuliah).filter(MataKuliah.dosen_id == u_id_val).delete(synchronize_session=False)
             db.delete(user)
             db.commit()
+            delete_user_from_supabase(u_id_val)
         return {"status": "success", "message": "Pengguna dan jadwal/matkul terkait berhasil dihapus"}
 
     nama = body.get("nama")
@@ -432,7 +607,7 @@ async def create_or_update_user(request: Request, db: Session = Depends(get_db))
 
     user = db.query(User).filter((User.id == uid) | (User.email == email)).first()
     if not user:
-        raw_pass = body.get("password") or "password123"
+        raw_pass = body.get("password") or uid
         user = User(
             id=uid,
             password=hash_pw(raw_pass)
@@ -445,11 +620,44 @@ async def create_or_update_user(request: Request, db: Session = Depends(get_db))
     user.jurusan_id = body.get("jurusan_id") or body.get("jurusanId", user.jurusan_id or "JUR001")
     user.jurusan_nama = body.get("jurusan_nama") or body.get("jurusanNama", user.jurusan_nama or "Teknik Informatika")
     user.fakultas_nama = body.get("fakultas_nama") or body.get("fakultasNama", user.fakultas_nama or "Fakultas Sains & Teknologi")
+    user.matkul_nama = body.get("matkul_nama") or body.get("matkulNama", user.matkul_nama)
     user.is_priority = bool(body.get("is_priority") if "is_priority" in body else body.get("isPriority", user.is_priority))
     if body.get("password"):
         user.password = hash_pw(body["password"])
 
     db.commit()
+
+    # Automatically bind assigned matkul_nama to MataKuliah table and Supabase
+    if user.matkul_nama:
+        for part in user.matkul_nama.split(","):
+            clean = part.strip()
+            if "-" in clean:
+                clean = clean.split("-")[-1].strip()
+            if clean:
+                db.query(MataKuliah).filter(
+                    (MataKuliah.nama.ilike(f"%{clean}%")) |
+                    (MataKuliah.kode.ilike(f"%{clean}%"))
+                ).update({"dosen_id": user.id, "dosen_nama": user.nama}, synchronize_session=False)
+                db.commit()
+                try:
+                    url_mk = f"{SUPABASE_URL}/rest/v1/mata_kuliah?nama=ilike.%25{clean}%25"
+                    requests.patch(url_mk, headers=SB_HEADERS, json={"dosen_id": user.id, "dosen_nama": user.nama}, timeout=5)
+                except Exception:
+                    pass
+
+    # Sync to Supabase Cloud
+    sync_user_to_supabase({
+        "id": user.id,
+        "nama": user.nama,
+        "email": user.email,
+        "password": user.password,
+        "role": user.role,
+        "jurusan_id": user.jurusan_id,
+        "jurusan_nama": user.jurusan_nama,
+        "fakultas_nama": user.fakultas_nama,
+        "matkul_nama": user.matkul_nama,
+        "is_priority": bool(user.is_priority),
+    })
     return {
         "status": "success",
         "message": "Pengguna berhasil disimpan",
@@ -461,6 +669,7 @@ async def create_or_update_user(request: Request, db: Session = Depends(get_db))
             "jurusan_id": user.jurusan_id,
             "jurusan_nama": user.jurusan_nama,
             "fakultas_nama": user.fakultas_nama,
+            "matkul_nama": user.matkul_nama,
             "is_priority": bool(user.is_priority),
             "avatar_url": user.avatar_url
         }
@@ -484,6 +693,7 @@ def delete_user(id: str = Query(...), db: Session = Depends(get_db)):
         db.query(MataKuliah).filter(MataKuliah.dosen_id == u_id_val).delete(synchronize_session=False)
         db.delete(user)
         db.commit()
+        delete_user_from_supabase(u_id_val)
     return {"status": "success", "message": "Pengguna dan jadwal/matkul terkait berhasil dihapus"}
 
 # ─── SLOT WAKTU ────────────────────────────────────────────────────────
