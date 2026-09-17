@@ -68,9 +68,39 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if clean_ident.endswith("@gmail"):
         clean_ident += ".com"
 
-    user = db.query(User).filter(
-        (User.email.ilike(ident)) | (User.email.ilike(clean_ident)) | (User.id.ilike(ident))
-    ).first()
+    # 1. Coba ambil user dari Supabase REST API (Primary Source of Truth)
+    user = None
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/users?or=(email.ilike.{ident},email.ilike.{clean_ident},id.ilike.{ident})"
+        resp = requests.get(url, headers=SB_HEADERS, timeout=5)
+        if resp.status_code == 200:
+            users_data = resp.json()
+            if users_data and len(users_data) > 0:
+                u = users_data[0]
+                user = User(
+                    id=u.get("id"),
+                    nama=u.get("nama"),
+                    email=u.get("email"),
+                    password=u.get("password"),
+                    role=u.get("role"),
+                    jurusan_id=u.get("jurusan_id"),
+                    jurusan_nama=u.get("jurusan_nama"),
+                    fakultas_nama=u.get("fakultas_nama"),
+                    matkul_nama=u.get("matkul_nama"),
+                    is_priority=u.get("is_priority"),
+                    avatar_url=u.get("avatar_url")
+                )
+    except Exception:
+        pass
+
+    # 2. Fallback ke SQLite jika Supabase REST tidak merespons
+    if not user:
+        try:
+            user = db.query(User).filter(
+                (User.email.ilike(ident)) | (User.email.ilike(clean_ident)) | (User.id.ilike(ident))
+            ).first()
+        except Exception:
+            pass
 
     if not user:
         raise HTTPException(
