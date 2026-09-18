@@ -348,40 +348,42 @@ class AvailabilityApiService {
     String? prodi,
     String? status,
   }) async {
-    try {
-      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/ajuan_pengajaran?select=*');
-      final resp = await http.get(
-        uri,
-        headers: {
-          'apikey': ApiConfig.supabasePublishableKey,
-          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 4));
-      if (resp.statusCode == 200) {
-        final decoded = jsonDecode(resp.body);
-        if (decoded is List && decoded.isNotEmpty) {
-          final list = decoded.map((a) => AjuanPengajaranModel.fromJson(Map<String, dynamic>.from(a))).toList();
-          MockDatabase.ajuanPengajaranList
-            ..clear()
-            ..addAll(list);
-          await MockDatabase.saveLocalAjuan();
+    // 1. Prioritaskan pengambilan data real-time langsung dari Supabase Cloud
+    if (!ApiConfig.useMockBackend) {
+      try {
+        final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/ajuan_pengajaran?select=*&order=created_at.desc');
+        final resp = await http.get(
+          uri,
+          headers: {
+            'apikey': ApiConfig.supabasePublishableKey,
+            'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+            'Accept': 'application/json',
+          },
+        ).timeout(const Duration(seconds: 6));
+        if (resp.statusCode == 200) {
+          final decoded = jsonDecode(resp.body);
+          if (decoded is List && decoded.isNotEmpty) {
+            final list = decoded.map((a) => AjuanPengajaranModel.fromJson(Map<String, dynamic>.from(a))).toList();
+            MockDatabase.ajuanPengajaranList
+              ..clear()
+              ..addAll(list);
+            await MockDatabase.saveLocalAjuan();
+            final onlineFiltered = list.where((a) {
+              if (dosenId != null && dosenId.isNotEmpty && a.dosenId != dosenId) return false;
+              if (fakultas != null && fakultas.isNotEmpty && a.fakultasNama != fakultas) return false;
+              if (prodi != null && prodi.isNotEmpty && a.jurusanNama != prodi) return false;
+              if (status != null && status.isNotEmpty && a.status != status) return false;
+              return true;
+            }).toList();
+            return List.unmodifiable(onlineFiltered);
+          }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
+    }
 
     await MockDatabase.initLocalCache();
-    MockDatabase.purgeInvalidSchedules();
-    await Future.delayed(const Duration(milliseconds: 150));
+    await Future.delayed(const Duration(milliseconds: 100));
     final filtered = MockDatabase.ajuanPengajaranList.where((a) {
-      final isGedungDeleted = MockDatabase.deletedGedungIds.contains(a.gedungNama);
-      final isRuanganDeleted = MockDatabase.deletedRuanganIds.contains(a.ruanganNama);
-      final isMatkulDeleted = MockDatabase.deletedMatkulIds.contains(a.mataKuliahId) || MockDatabase.deletedMatkulIds.contains(a.mataKuliahNama);
-      final isDosenDeleted = MockDatabase.deletedUserIds.contains(a.dosenId) || MockDatabase.deletedUserIds.contains(a.dosenNama);
-      final isFakultasDeleted = MockDatabase.deletedFakultasIds.contains(a.fakultasNama);
-      if (isGedungDeleted || isRuanganDeleted || isMatkulDeleted || isDosenDeleted || isFakultasDeleted) {
-        return false;
-      }
       if (dosenId != null && dosenId.isNotEmpty && a.dosenId != dosenId) return false;
       if (fakultas != null && fakultas.isNotEmpty && a.fakultasNama != fakultas) return false;
       if (prodi != null && prodi.isNotEmpty && a.jurusanNama != prodi) return false;

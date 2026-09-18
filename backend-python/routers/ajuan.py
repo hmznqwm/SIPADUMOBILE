@@ -164,6 +164,46 @@ def get_ajuan(
         q = q.filter(AjuanPengajaran.fakultas_nama.ilike(f"%{fakultas}%"))
     
     items = q.order_by(AjuanPengajaran.created_at.desc()).all()
+    if not items:
+        try:
+            r = requests.get(f"{SUPABASE_URL}/rest/v1/ajuan_pengajaran?select=*&order=created_at.desc", headers=SB_HEADERS, timeout=5)
+            if r.status_code == 200 and r.json():
+                for item in r.json():
+                    exist = db.query(AjuanPengajaran).filter(AjuanPengajaran.id == item["id"]).first()
+                    if not exist:
+                        db.add(AjuanPengajaran(
+                            id=item["id"],
+                            dosen_id=item.get("dosen_id"),
+                            dosen_nama=item.get("dosen_nama"),
+                            fakultas_nama=item.get("fakultas_nama"),
+                            jurusan_nama=item.get("jurusan_nama"),
+                            mata_kuliah_id=item.get("mata_kuliah_id"),
+                            mata_kuliah_nama=item.get("mata_kuliah_nama"),
+                            sks=item.get("sks", 3),
+                            semester=item.get("semester", 1),
+                            kelas_nama=item.get("kelas_nama"),
+                            jumlah_mahasiswa=item.get("jumlah_mahasiswa", 40),
+                            gedung_nama=item.get("gedung_nama"),
+                            ruangan_nama=item.get("ruangan_nama"),
+                            hari=item.get("hari"),
+                            jam_mulai=item.get("jam_mulai"),
+                            jam_selesai=item.get("jam_selesai"),
+                            status=item.get("status", "menunggu_kaprodi"),
+                            catatan_dosen=item.get("catatan_dosen"),
+                            catatan_kaprodi=item.get("catatan_kaprodi"),
+                            catatan_dekan=item.get("catatan_dekan"),
+                            catatan_admin=item.get("catatan_admin"),
+                            alasan_penolakan=item.get("alasan_penolakan"),
+                            alasan_banding=item.get("alasan_banding"),
+                            preferensi_banding_hari=item.get("preferensi_banding_hari"),
+                            preferensi_banding_jam=item.get("preferensi_banding_jam"),
+                            bentrok_detail=item.get("bentrok_detail"),
+                        ))
+                db.commit()
+                items = q.order_by(AjuanPengajaran.created_at.desc()).all()
+        except Exception as e:
+            logger.warning(f"Failed to auto-sync ajuan from Supabase: {e}")
+
     return {"status": "success", "data": [format_ajuan(a) for a in items]}
 
 @router.post("/submit")
