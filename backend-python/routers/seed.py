@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
 from sqlalchemy.orm import Session
+import os
 import bcrypt
+from typing import Optional
 from core.database import get_db, Base, engine
+from core.config import settings
 from models.models import User, Gedung, Ruangan, SlotWaktu, MataKuliah, MataKuliahKelas, AjuanPengajaran, JadwalFinal, Notification
 
 router = APIRouter(prefix="", tags=["Seed & Health"])
@@ -13,7 +16,19 @@ def hash_pw(password: str) -> str:
 @router.get("/seed.php")
 @router.post("/seed")
 @router.post("/seed.php")
-def run_seed(db: Session = Depends(get_db)):
+def run_seed(
+    key: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    # Proteksi seed endpoint dengan JWT Secret / Master Key
+    expected_key = settings.JWT_SECRET or "smartschedule_seed_dev_2026"
+    provided_key = key or (authorization.replace("Bearer ", "") if authorization else "")
+    if provided_key != expected_key and os.getenv("VERCEL_ENV") == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"status": "error", "message": "Endpoint seed dinonaktifkan di production. Akses ditolak."}
+        )
     Base.metadata.create_all(bind=engine)
     
     # Check if seed already executed

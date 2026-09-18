@@ -25,7 +25,8 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  int _selectedAdminTab = 0; // 0: Jadwal, 1: Resolusi Konflik
+  int _selectedAdminTab = 0; // 0: Jadwal Final, 1: Resolusi Konflik
+  int _displayedCount = 10;
   List<AjuanPengajaranModel> _allAjuanList = [];
   final Set<String> _selectedConflictIds = {};
 
@@ -142,20 +143,28 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final isPrivileged = isAdmin || isDekan || isKaProdi;
     final api = context.watch<ApiService>();
 
+    final seenIds = <String>{};
     final conflictsForRole = _allAjuanList.where((a) {
+      if (seenIds.contains(a.id)) return false;
       if (a.status.startsWith('ditolak')) return false;
       final conflictInfo = api.checkBuildingConflict(a);
-      final isConflict = a.status == 'bentrok_terdeteksi' ||
-          a.status == 'menunggu_banding' ||
-          conflictInfo['hasConflict'] == true ||
-          (a.status != 'disetujui_admin' && a.status != 'banding_disetujui' && a.bentrokDetail != null && a.bentrokDetail!.isNotEmpty);
+      final bool isConflict;
+      if (conflictInfo['hasConflict'] == true) {
+        isConflict = true;
+      } else if (a.status == 'disetujui_admin' || a.status == 'banding_disetujui') {
+        isConflict = false;
+      } else {
+        isConflict = a.status == 'bentrok_terdeteksi' ||
+            a.status == 'menunggu_banding' ||
+            (a.bentrokDetail != null && a.bentrokDetail!.isNotEmpty);
+      }
       if (!isConflict) return false;
       if (isKaProdi) {
-        return a.jurusanNama == (user?.jurusanNama ?? 'Teknik Informatika');
+        if (a.jurusanNama != (user?.jurusanNama ?? 'Teknik Informatika')) return false;
+      } else if (isDekan) {
+        if (a.fakultasNama != 'Fakultas Sains & Teknologi') return false;
       }
-      if (isDekan) {
-        return a.fakultasNama == 'Fakultas Sains & Teknologi';
-      }
+      seenIds.add(a.id);
       return true;
     }).toList();
     final conflictCount = conflictsForRole.length;
@@ -225,9 +234,41 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       message: 'Belum ada jadwal mengajar pada hari yang dipilih.',
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-                      itemCount: filteredList.length,
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                      itemCount: filteredList.length > _displayedCount
+                          ? _displayedCount + 1
+                          : filteredList.length,
                       itemBuilder: (context, index) {
+                        if (index == _displayedCount && filteredList.length > _displayedCount) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 14, bottom: 16),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    _displayedCount += 10;
+                                  });
+                                },
+                                icon: const Icon(Icons.expand_more_rounded, size: 20),
+                                label: Text(
+                                  'Muat 10 Jadwal Lagi (${filteredList.length - _displayedCount} Tersisa)',
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.2),
+                                  padding: const EdgeInsets.symmetric(vertical: 13),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 0,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
                         return ScheduleCard(item: filteredList[index]);
                       },
                     ),

@@ -256,12 +256,11 @@ Future<UserModel?> showSearchableDosenPicker({
                                                 ),
                                                 decoration: BoxDecoration(
                                                   color:
-                                                      const Color(0xFFECFDF5),
+                                                      const Color(0xFFF3E8FF),
                                                   borderRadius:
                                                       BorderRadius.circular(4),
                                                   border: Border.all(
-                                                    color: AppColors.primary
-                                                        .withValues(alpha: 0.3),
+                                                    color: const Color(0xFFC084FC),
                                                   ),
                                                 ),
                                                 child: const Text(
@@ -269,7 +268,7 @@ Future<UserModel?> showSearchableDosenPicker({
                                                   style: TextStyle(
                                                     fontSize: 9,
                                                     fontWeight: FontWeight.bold,
-                                                    color: AppColors.primary,
+                                                    color: Color(0xFF7C3AED),
                                                   ),
                                                 ),
                                               ),

@@ -7,7 +7,11 @@ from models.models import AjuanPengajaran, User, JadwalFinal
 import secrets
 import requests
 
-from core.config import SUPABASE_URL, SB_HEADERS
+from core.config import SUPABASE_URL, SUPABASE_KEY, SB_HEADERS
+from core.security import sanitize_supabase_param
+import logging
+
+logger = logging.getLogger("smartschedule.ajuan")
 
 def sync_ajuan_to_supabase(a: AjuanPengajaran):
     try:
@@ -41,15 +45,16 @@ def sync_ajuan_to_supabase(a: AjuanPengajaran):
             "bentrok_detail": a.bentrok_detail,
         }
         requests.post(url, headers=SB_HEADERS, json=payload, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to sync ajuan to Supabase: {e}")
 
 def delete_ajuan_from_supabase(aid: str):
     try:
-        url = f"{SUPABASE_URL}/rest/v1/ajuan_pengajaran?id=eq.{aid}"
+        safe_id = sanitize_supabase_param(aid)
+        url = f"{SUPABASE_URL}/rest/v1/ajuan_pengajaran?id=eq.{safe_id}"
         requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to delete ajuan from Supabase: {e}")
 
 def sync_jadwal_to_supabase(j: JadwalFinal):
     try:

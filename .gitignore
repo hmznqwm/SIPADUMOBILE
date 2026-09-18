@@ -1,7 +1,12 @@
+# Secrets & Environment
+.env
+*.env.local
+
 # Python
 .venv/
 __pycache__/
 *.pyc
+*.db
 *.db-journal
 
 # Flutter / Dart
@@ -14,3 +19,4 @@ build/
 .idea/
 .DS_Store
 *.tmp
+scratch/

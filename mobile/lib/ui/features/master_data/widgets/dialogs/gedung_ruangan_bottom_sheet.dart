@@ -46,12 +46,8 @@ class _GedungRuanganSheetContent extends StatefulWidget {
 class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> {
   List<RuanganModel> _ruanganList = [];
   bool _isLoading = true;
-  bool _isAddingInline = false;
-
   final _namaCtrl = TextEditingController();
   final _kapasitasCtrl = TextEditingController(text: '40');
-  String _selectedTipe = 'Kelas Teori';
-  final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -183,7 +179,7 @@ class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> 
                         Expanded(
                           flex: 3,
                           child: DropdownButtonFormField<String>(
-                            value: selectedTipe,
+                            initialValue: selectedTipe,
                             decoration: InputDecoration(
                               labelText: 'Tipe Ruangan',
                               filled: true,
@@ -322,10 +318,13 @@ class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> 
     );
 
     if (confirm == true) {
+      if (!mounted) return;
       final api = context.read<ApiService>();
       await api.deleteRuangan(r.id);
       await _loadRuangan();
-      widget.onRuanganUpdated?.call();
+      if (mounted) {
+        widget.onRuanganUpdated?.call();
+      }
     }
   }
 

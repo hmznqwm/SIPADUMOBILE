@@ -168,6 +168,15 @@ class ApiService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<List<MataKuliahModel>> getAllMataKuliah() =>
+      _masterDataService.getAllMataKuliah();
+
+  Future<void> saveMataKuliah(Map<String, dynamic> matkul) =>
+      _masterDataService.saveMataKuliah(matkul);
+
+  Future<void> deleteMataKuliah(String mkId) =>
+      _masterDataService.deleteMataKuliah(mkId);
+
   List<UserModel> getDemoUsers() =>
       _masterDataService.getDemoUsers();
 

@@ -3,19 +3,19 @@
 // Fungsi: Menyediakan form autentikasi NIDN & password, opsi login Google SSO (simulasi), dialog lupa password, serta desain visual background ambient.
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../config/api_config.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
 import '../../../../config/constants.dart';
 import '../../../../data/services/api_service.dart';
 import '../view_models/auth_view_model.dart';
 import '../widgets/login_background_painter.dart';
 import '../widgets/login_forgot_password_dialog.dart';
-import '../widgets/login_google_unregistered_dialog.dart';
 import '../widgets/login_offline_banner.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -146,76 +146,72 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn(
-        serverClientId: ApiConfig.googleClientId,
         scopes: ['email', 'profile'],
       );
 
-      // Sign out first to ensure fresh account selection without cached loop
+      // Sign out first to ensure fresh account selection chooser from Google
       await googleSignIn.signOut().catchError((_) => null);
 
       final GoogleSignInAccount? account = await googleSignIn.signIn();
 
       if (account == null) {
-        // User canceled / dismissed the account chooser
+        // User canceled account picker
         return;
       }
 
-      final GoogleSignInAuthentication auth = await account.authentication;
+      String? idToken;
+      try {
+        final GoogleSignInAuthentication auth = await account.authentication;
+        idToken = auth.idToken;
+      } catch (_) {}
 
       final success = await authViewModel.googleLogin(
         email: account.email,
         displayName: account.displayName ?? account.email,
         photoUrl: account.photoUrl,
-        idToken: auth.idToken,
+        idToken: idToken,
       );
 
       if (success && mounted) {
         Navigator.pushReplacementNamed(context, '/main');
       } else if (mounted) {
-        LoginGoogleUnregisteredDialog.show(context, account.email);
+        final errMsg = authViewModel.errorMessage ??
+            'Akun Google (${account.email}) belum terdaftar di database institusi. Gunakan akun yang valid.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errMsg
+                  .replaceAll('ApiException: ', '')
+                  .replaceAll('Exception: ', ''),
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
       }
     } catch (e) {
-      debugPrint('Google Sign-In Info/Error: $e');
+      debugPrint('Google Sign-In Error: $e');
       if (mounted) {
         final errStr = e.toString();
-        if (errStr.contains('ApiException: 10') ||
-            errStr.contains('sign_in_failed') ||
-            errStr.contains('10:') ||
-            errStr.contains('network_error') ||
-            errStr.contains('com.google.android.gms')) {
-          final directSuccess = await authViewModel.googleLogin(
-            email: 'hamizanqowiem90@gmail.com',
-            displayName: 'Hamizan Qowiem',
-            photoUrl: null,
-            idToken: null,
-          );
-          if (directSuccess && mounted) {
-            Navigator.pushReplacementNamed(context, '/main');
-            return;
-          }
-        }
-
-        if (!mounted) return;
-        if (errStr.contains('UNREGISTERED') ||
-            errStr.contains('tidak ditemukan') ||
-            errStr.contains('belum terdaftar')) {
-          LoginGoogleUnregisteredDialog.show(context);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                errStr
-                    .replaceAll('ApiException: ', '')
-                    .replaceAll('Exception: ', ''),
-              ),
-              backgroundColor: AppColors.error,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errStr
+                  .replaceAll('ApiException: ', '')
+                  .replaceAll('PlatformException: ', '')
+                  .replaceAll('Exception: ', ''),
             ),
-          );
-        }
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
       }
     }
   }
@@ -244,9 +240,11 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Center(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 28.0,
-                  vertical: 24.0,
+                padding: EdgeInsets.fromLTRB(
+                  28.0,
+                  24.0,
+                  28.0,
+                  24.0 + math.max(MediaQuery.of(context).padding.bottom, 20.0),
                 ),
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 400),

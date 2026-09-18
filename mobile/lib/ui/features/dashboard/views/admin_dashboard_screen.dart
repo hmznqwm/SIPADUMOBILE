@@ -1,6 +1,6 @@
 // File: admin_dashboard_screen.dart
 // Deskripsi: Tampilan (View) dashboard khusus Super Admin Penjadwalan.
-// Fungsi: Ringkasan statistik institusi, eksekusi engine SCP, sakelar window ketersediaan, dan permohonan banding dosen.
+// Fungsi: Ringkasan statistik institusi, eksekusi engine CSP, sakelar window ketersediaan, dan permohonan banding dosen.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../../config/constants.dart';
 import '../../../../data/models/ajuan_pengajaran_model.dart';
 import '../../../../data/models/gedung_model.dart';
+import '../../../../data/models/jadwal_model.dart';
 import '../../../../data/models/ruangan_model.dart';
 import '../../../../data/models/user_model.dart';
 import '../../../../data/services/api_service.dart';
@@ -31,6 +32,8 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
   List<RuanganModel> _ruanganList = [];
   List<UserModel> _allUsersList = [];
   List<AjuanPengajaranModel> _allAjuanList = [];
+  List<dynamic> _allMatkulList = [];
+  List<JadwalModel> _jadwalList = [];
   bool _isLoading = true;
 
   @override
@@ -47,12 +50,10 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
       final active = await api.getSubmissionWindowStatus();
       final gedung = await api.getGedungList();
       final ruangan = await api.getRuanganList();
-      debugPrint('DEBUG_COUNT_RUANGAN: ${ruangan.length}');
-      for (final r in ruangan) {
-        debugPrint('DEBUG_ROOM: id=${r.id}, nama=${r.nama}, gId=${r.gedungId}, gNama=${r.gedungNama}');
-      }
       final users = await api.getAllUsers();
       final ajuan = await api.getAjuanPengajaranList();
+      final matkul = await api.getAllMataKuliah();
+      final jadwal = await api.getGlobalJadwal();
 
       if (mounted) {
         setState(() {
@@ -61,6 +62,8 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
           _ruanganList = ruangan;
           _allUsersList = users;
           _allAjuanList = ajuan;
+          _allMatkulList = matkul;
+          _jadwalList = jadwal;
           _isLoading = false;
         });
       }
@@ -88,12 +91,142 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
     }
   }
 
+  bool get _isAllApprovedAndConflictFree {
+    if (_allAjuanList.isEmpty) return true;
+    final unapprovedOrPending = _allAjuanList.where((a) =>
+        a.status != 'disetujui_admin' &&
+        a.status != 'disetujui' &&
+        a.status != 'banding_disetujui');
+    final bentrok = _allAjuanList.where((a) =>
+        a.status == 'bentrok_terdeteksi' ||
+        (a.bentrokDetail != null && a.bentrokDetail!.trim().isNotEmpty));
+    return unapprovedOrPending.isEmpty && bentrok.isEmpty;
+  }
+
   Future<void> _runCSPEngine() async {
+    if (_isAllApprovedAndConflictFree) {
+      final forceRun = await showModalBottomSheet<bool>(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.primary,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Jadwal Sudah Rapi & Optimal',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Tidak ada jadwal yang perlu dirapikan',
+                          style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Text(
+                  'Seluruh pengajuan jam & ruang mengajar dosen telah disetujui oleh Admin dan 0 bentrok terdeteksi. Semua susunan jadwal perkuliahan institusi sudah terstruktur rapi dan optimal!',
+                  style: TextStyle(fontSize: 12.5, color: Color(0xFF334155), height: 1.45),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text(
+                        'Tutup',
+                        style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text(
+                        'Tetap Re-Generate',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (forceRun != true || !mounted) return;
+    }
+
     final confirm = await CspConfirmationDialog.show(
       context,
       scopeTitle: 'Seluruh Fakultas & Program Studi',
       scopeDescription:
-          'Engine SCP global akan memproses preferensi seluruh dosen dan menyusun jadwal mata kuliah institusi secara otomatis bebas bentrok.',
+          'Engine CSP global akan memproses preferensi seluruh dosen dan menyusun jadwal mata kuliah institusi secara otomatis bebas bentrok.',
       roleLabel: 'Super Admin Penjadwalan',
     );
     if (confirm != true || !mounted) return;
@@ -223,13 +356,17 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
           gedungList: _gedungList,
           ruanganList: _ruanganList,
           allUsersList: _allUsersList,
+          allMatkulList: _allMatkulList,
+          allAjuanList: _allAjuanList,
+          jadwalList: _jadwalList,
         ),
         const SizedBox(height: AppSpacing.md),
 
-        // ── Otomasi & Kontrol Jadwal (SCP & Window Ketersediaan) ──
+        // ── Otomasi & Kontrol Jadwal (CSP & Window Ketersediaan) ──
         AdminAutomationSection(
           isSubmissionActive: _isSubmissionActive,
           isEngineRunning: _isEngineRunning,
+          isAllApprovedAndConflictFree: _isAllApprovedAndConflictFree,
           onRunCSPEngine: _runCSPEngine,
           onToggleSubmissionStatus: _toggleSubmissionStatus,
         ),

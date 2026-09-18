@@ -6,7 +6,11 @@ from models.models import JadwalFinal, AjuanPengajaran
 import secrets
 import requests
 
-from core.config import SUPABASE_URL, SB_HEADERS
+from core.config import SUPABASE_URL, SUPABASE_KEY, SB_HEADERS
+from core.security import sanitize_supabase_param
+import logging
+
+logger = logging.getLogger("smartschedule.schedule")
 
 def sync_jadwal_to_supabase(j: JadwalFinal):
     try:
@@ -29,15 +33,16 @@ def sync_jadwal_to_supabase(j: JadwalFinal):
             "jumlah_mahasiswa": j.jumlah_mahasiswa
         }
         requests.post(url, headers=SB_HEADERS, json=payload, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to sync jadwal to Supabase: {e}")
 
 def delete_jadwal_from_supabase(jid: str):
     try:
-        url = f"{SUPABASE_URL}/rest/v1/jadwal_final?id=eq.{jid}"
+        safe_id = sanitize_supabase_param(jid)
+        url = f"{SUPABASE_URL}/rest/v1/jadwal_final?id=eq.{safe_id}"
         requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to delete jadwal from Supabase: {e}")
 
 router = APIRouter(prefix="/schedule", tags=["Schedule"])
 

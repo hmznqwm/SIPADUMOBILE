@@ -1,1 +1,6 @@
 .vercel
+.env
+*.db
+*.db-journal
+__pycache__/
+*.pyc

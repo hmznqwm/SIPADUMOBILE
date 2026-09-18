@@ -125,23 +125,47 @@ class DosenAjuanCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${ajuan.sks} SKS',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${ajuan.sks} SKS',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Sem ${ajuan.semester}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF475569),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -150,34 +174,14 @@ class DosenAjuanCard extends StatelessWidget {
                 const Divider(height: 1, color: Color(0xFFF1F5F9)),
                 const SizedBox(height: 10),
 
-                // Info Grid: Semester, Kelas, Siswa, Hari & Jam, Gedung, Ruang
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    InfoChip(
-                      icon: Icons.stairs_rounded,
-                      label: 'Semester ${ajuan.semester}',
-                    ),
-                    InfoChip(
-                      icon: Icons.groups_rounded,
-                      label:
-                          'Kelas ${ajuan.kelasNama} (${ajuan.jumlahMahasiswa} Mhs)',
-                    ),
-                    InfoChip(
-                      icon: Icons.calendar_today_rounded,
-                      label:
-                          '${ajuan.hari}, ${ajuan.jamMulai} - ${ajuan.jamSelesai}',
-                    ),
-                    InfoChip(
-                      icon: Icons.domain_rounded,
-                      label: ajuan.gedungNama,
-                    ),
-                    InfoChip(
-                      icon: Icons.meeting_room_rounded,
-                      label: 'Ruang: ${ajuan.ruanganNama}',
-                    ),
-                  ],
+                AjuanCardDetailGrid(
+                  hari: ajuan.hari,
+                  waktuFormatted: ajuan.waktuFormatted,
+                  kelasNama: ajuan.kelasNama,
+                  jumlahMahasiswa: ajuan.jumlahMahasiswa,
+                  semester: ajuan.semester,
+                  ruanganNama: ajuan.ruanganNama,
+                  gedungNama: ajuan.gedungNama,
                 ),
 
                 // Rejection or Adjustment Notice

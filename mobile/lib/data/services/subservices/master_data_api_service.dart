@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../../../config/api_config.dart';
 import '../../models/user_model.dart';
 import '../../models/mata_kuliah_model.dart';
@@ -13,83 +16,194 @@ class MasterDataApiService {
   MasterDataApiService({ApiHttpHelper? httpHelper})
       : _httpHelper = httpHelper ?? ApiHttpHelper();
 
-  /// GET /api/master/mata_kuliah.php
-  Future<List<MataKuliahModel>> getMataKuliah(String dosenId) async {
-    if (!ApiConfig.useMockBackend) {
-      try {
-        final data = await _httpHelper.makeOnlineRequest('/master/mata_kuliah.php?dosen_id=$dosenId&dosenId=$dosenId');
-        if (data is Map && data['status'] == 'success' && data['data'] != null) {
-          final list = (data['data'] as List).map((mk) => MataKuliahModel.fromJson(mk)).toList();
-          if (list.isNotEmpty) return list;
+  /// GET /api/master/mata_kuliah.php (All)
+  Future<List<MataKuliahModel>> getAllMataKuliah() async {
+    // 1. Coba lewat backend Python
+    try {
+      final data = await _httpHelper.makeOnlineRequest('/master/mata_kuliah.php');
+      if (data is Map && data['status'] == 'success' && data['data'] != null) {
+        return (data['data'] as List).map((mk) => MataKuliahModel.fromJson(mk)).toList();
+      }
+    } catch (_) {}
+
+    // 2. Direct Supabase Cloud Fallback
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/mata_kuliah?select=*');
+      final resp = await http.get(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is List && decoded.isNotEmpty) {
+          return decoded.map((mk) => MataKuliahModel.fromJson(Map<String, dynamic>.from(mk))).toList();
         }
-      } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('Direct Supabase getAllMataKuliah error: $e');
     }
 
-    await Future.delayed(MockDatabase.defaultDelay);
-    if (dosenId == 'DSN001') return MockDatabase.mataKuliahDSN001;
+    return [];
+  }
 
-    return [
-      MataKuliahModel(
-        id: 'MK_${dosenId}_01',
-        nama: 'Algoritma & Pemrograman Lanjut',
-        sks: 3,
-        jurusanId: 'JUR001',
-        jurusanNama: 'Teknik Informatika',
-        fakultasNama: 'Fakultas Sains & Teknologi',
-        semesterId: 'SEM001',
-        kelasNama: const ['TI-1A', 'TI-1B'],
-      ),
-      MataKuliahModel(
-        id: 'MK_${dosenId}_02',
-        nama: 'Basis Data & Rekayasa Informasi',
-        sks: 3,
-        jurusanId: 'JUR002',
-        jurusanNama: 'Sistem Informasi',
-        fakultasNama: 'Fakultas Sains & Teknologi',
-        semesterId: 'SEM001',
-        kelasNama: const ['SI-3A', 'SI-3B'],
-      ),
-      MataKuliahModel(
-        id: 'MK_${dosenId}_03',
-        nama: 'Sistem Terdistribusi & Cloud',
-        sks: 3,
-        jurusanId: 'JUR001',
-        jurusanNama: 'Teknik Informatika',
-        fakultasNama: 'Fakultas Sains & Teknologi',
-        semesterId: 'SEM001',
-        kelasNama: const ['TI-5A', 'TI-5B'],
-      ),
-    ];
+  /// GET /api/master/mata_kuliah.php
+  Future<List<MataKuliahModel>> getMataKuliah(String dosenId) async {
+    try {
+      final url = (dosenId.isNotEmpty && dosenId != 'Semua')
+          ? '/master/mata_kuliah.php?dosen_id=$dosenId&dosenId=$dosenId'
+          : '/master/mata_kuliah.php';
+      final data = await _httpHelper.makeOnlineRequest(url);
+      if (data is Map && data['status'] == 'success' && data['data'] != null) {
+        final list = (data['data'] as List).map((mk) => MataKuliahModel.fromJson(mk)).toList();
+        if (list.isNotEmpty) return list;
+      }
+    } catch (_) {}
+
+    // Direct Supabase Cloud Fallback
+    try {
+      final filter = (dosenId.isNotEmpty && dosenId != 'Semua') ? '?dosen_id=eq.$dosenId&select=*' : '?select=*';
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/mata_kuliah$filter');
+      final resp = await http.get(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is List && decoded.isNotEmpty) {
+          return decoded.map((mk) => MataKuliahModel.fromJson(Map<String, dynamic>.from(mk))).toList();
+        }
+      }
+
+      // Check User's assigned matkul_nama in Supabase
+      if (dosenId.isNotEmpty && dosenId != 'Semua') {
+        final userUri = Uri.parse(
+          '${ApiConfig.supabaseUrl}/rest/v1/users?or=(id.eq.${Uri.encodeComponent(dosenId)},email.ilike.${Uri.encodeComponent(dosenId)})&select=*'
+        );
+        final uResp = await http.get(
+          userUri,
+          headers: {
+            'apikey': ApiConfig.supabasePublishableKey,
+            'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+            'Accept': 'application/json',
+          },
+        ).timeout(const Duration(seconds: 6));
+
+        if (uResp.statusCode == 200) {
+          final uDecoded = jsonDecode(uResp.body);
+          if (uDecoded is List && uDecoded.isNotEmpty) {
+            final uMap = uDecoded.first;
+            final matkulStr = (uMap['matkul_nama'] ?? uMap['matkulNama'] ?? '').toString().trim();
+            if (matkulStr.isNotEmpty) {
+              final result = <MataKuliahModel>[];
+              final parts = matkulStr.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty);
+              int idx = 1;
+              for (final part in parts) {
+                final cleanName = part.contains('-') ? part.split('-').last.trim() : part;
+                result.add(
+                  MataKuliahModel(
+                    id: 'MK_${dosenId}_$idx',
+                    nama: cleanName,
+                    sks: 3,
+                    jurusanId: uMap['jurusan_id']?.toString() ?? 'JUR001',
+                    jurusanNama: uMap['jurusan_nama']?.toString() ?? 'Teknik Informatika',
+                    fakultasNama: uMap['fakultas_nama']?.toString() ?? 'Fakultas Sains & Teknologi',
+                    dosenId: dosenId,
+                    dosenNama: uMap['nama']?.toString() ?? 'Dosen Pengampu',
+                    semesterId: 'SEM001',
+                    kebutuhanTipeRuangan: 'Kelas Teori',
+                    kelasIds: ['${dosenId}_KLS_1', '${dosenId}_KLS_2'],
+                    kelasNama: const ['Kelas A', 'Kelas B'],
+                  ),
+                );
+                idx++;
+              }
+              if (result.isNotEmpty) return result;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    return [];
   }
 
   /// GET slot waktu master data
   Future<List<SlotWaktuModel>> getSlotWaktu() async {
+    // 1. Coba lewat backend Python
+    try {
+      final data = await _httpHelper.makeOnlineRequest('/master/slot_waktu.php');
+      if (data is Map && data['status'] == 'success' && data['data'] != null) {
+        return (data['data'] as List).map((s) => SlotWaktuModel.fromJson(Map<String, dynamic>.from(s))).toList();
+      }
+    } catch (_) {}
+
+    // 2. Direct Supabase Cloud Fallback
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/slot_waktu?select=*');
+      final resp = await http.get(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 6));
+
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is List && decoded.isNotEmpty) {
+          return decoded.map((s) => SlotWaktuModel.fromJson(Map<String, dynamic>.from(s))).toList();
+        }
+      }
+    } catch (_) {}
+
     await Future.delayed(const Duration(milliseconds: 150));
     return MockDatabase.slotWaktu;
   }
 
-  /// GET all demo users / lecturers
+  /// GET all users / lecturers
   Future<List<UserModel>> getAllUsers() async {
-    await MockDatabase.initLocalCache();
-    if (!ApiConfig.useMockBackend) {
-      try {
-        final data = await _httpHelper.makeOnlineRequest('/master/users.php');
-        if (data is Map && data['status'] == 'success' && data['data'] != null) {
-          final list = (data['data'] as List).map((u) => UserModel.fromJson(u)).toList();
-          if (list.isNotEmpty) {
-            MockDatabase.demoUsers.clear();
-            MockDatabase.demoUsers.addAll(list);
-            await MockDatabase.saveLocalUsers();
-            return list;
-          }
+    // 1. Coba lewat backend Python
+    try {
+      final data = await _httpHelper.makeOnlineRequest('/master/users.php');
+      if (data is Map && data['status'] == 'success' && data['data'] != null) {
+        return (data['data'] as List).map((u) => UserModel.fromJson(u)).toList();
+      }
+    } catch (_) {}
+
+    // 2. Direct Supabase Cloud Fallback
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/users?select=*');
+      final resp = await http.get(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is List && decoded.isNotEmpty) {
+          return decoded.map((u) => UserModel.fromJson(Map<String, dynamic>.from(u))).toList();
         }
-      } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('Direct Supabase getAllUsers error: $e');
     }
-    await Future.delayed(const Duration(milliseconds: 150));
-    return MockDatabase.demoUsers.map((u) {
-      final isPriority = MockDatabase.priorityDosenIds.contains(u.id);
-      return u.copyWith(isPriority: isPriority);
-    }).toList();
+
+    return [];
   }
 
   /// TOGGLE Dosen Priority Flag (MRV Heuristic Priority)
@@ -100,140 +214,291 @@ class MasterDataApiService {
   }
 
   Future<void> setDosenPriority(String dosenId, bool priority) async {
-    if (priority) {
-      MockDatabase.priorityDosenIds.add(dosenId);
-    } else {
-      MockDatabase.priorityDosenIds.remove(dosenId);
-    }
-    await MockDatabase.saveLocalUsers();
-    if (!ApiConfig.useMockBackend) {
-      try {
-        await _httpHelper.makeOnlineRequest(
-          '/master/users.php',
-          method: 'POST',
-          body: {'dosenId': dosenId, 'isPriority': priority},
-        );
-      } catch (_) {}
-    }
-    await Future.delayed(const Duration(milliseconds: 150));
+    try {
+      await _httpHelper.makeOnlineRequest(
+        '/master/users.php',
+        method: 'POST',
+        body: {'dosenId': dosenId, 'isPriority': priority},
+      );
+    } catch (_) {}
+
+    // Direct Supabase Cloud Fallback
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/users?id=eq.$dosenId');
+      await http.patch(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'is_priority': priority}),
+      ).timeout(const Duration(seconds: 8));
+    } catch (_) {}
   }
 
   /// Create / Register new Dosen with email & login credentials
   Future<UserModel> createDosen(UserModel dosen, {String password = 'password123'}) async {
-    MockDatabase.demoUsers.removeWhere((u) => u.id == dosen.id || u.email.toLowerCase() == dosen.email.toLowerCase());
-    MockDatabase.demoUsers.add(dosen);
-    await MockDatabase.saveLocalUsers();
-    if (!ApiConfig.useMockBackend) {
-      try {
-        final data = await _httpHelper.makeOnlineRequest(
-          '/master/users.php',
-          method: 'POST',
-          body: {
-            'action': 'create',
-            'id': dosen.id,
-            'nidn': dosen.id,
-            'nama': dosen.nama,
-            'email': dosen.email,
-            'password': password,
-            'role': dosen.role,
-            'jurusan_id': dosen.jurusanId,
-            'jurusan_nama': dosen.jurusanNama,
-            'fakultas_nama': dosen.fakultasNama,
-            'is_priority': dosen.isPriority ? 1 : 0,
-          },
-        );
-        if (data is Map && data['status'] == 'success' && data['data'] != null) {
-          final saved = UserModel.fromJson(data['data']);
-          MockDatabase.demoUsers.removeWhere((u) => u.id == saved.id);
-          MockDatabase.demoUsers.add(saved);
-          await MockDatabase.saveLocalUsers();
-          return saved;
+    // 1. Send to Backend Python
+    try {
+      final data = await _httpHelper.makeOnlineRequest(
+        '/master/users.php',
+        method: 'POST',
+        body: {
+          'action': 'create',
+          'id': dosen.id,
+          'nidn': dosen.id,
+          'nama': dosen.nama,
+          'email': dosen.email,
+          'password': password,
+          'role': dosen.role,
+          'jurusan_id': dosen.jurusanId,
+          'jurusan_nama': dosen.jurusanNama,
+          'fakultas_nama': dosen.fakultasNama,
+          'matkul_nama': dosen.matkulNama ?? '',
+          'matkulNama': dosen.matkulNama ?? '',
+          'is_priority': dosen.isPriority ? 1 : 0,
+        },
+      );
+      if (data is Map && data['status'] == 'success' && data['data'] != null) {
+        // Updated from backend
+      }
+    } catch (_) {}
+
+    // 2. Direct Supabase Cloud Persistence
+    try {
+      // Check if user already exists by ID or email
+      final checkUri = Uri.parse(
+        '${ApiConfig.supabaseUrl}/rest/v1/users?or=(id.eq.${dosen.id},email.eq.${dosen.email})&select=id,role'
+      );
+      final checkResp = await http.get(
+        checkUri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 6));
+
+      bool userExists = false;
+      String targetId = dosen.id;
+      if (checkResp.statusCode == 200) {
+        final decoded = jsonDecode(checkResp.body);
+        if (decoded is List && decoded.isNotEmpty) {
+          userExists = true;
+          targetId = decoded[0]['id']?.toString() ?? dosen.id;
         }
-      } catch (_) {}
+      }
+
+      final payload = {
+        'id': targetId,
+        'nama': dosen.nama,
+        'email': dosen.email,
+        'password': password,
+        'role': dosen.role,
+        'jurusan_id': dosen.jurusanId.isNotEmpty ? dosen.jurusanId : 'JUR001',
+        'jurusan_nama': dosen.jurusanNama,
+        'fakultas_nama': dosen.fakultasNama,
+        'is_priority': dosen.isPriority,
+        'matkul_nama': dosen.matkulNama ?? '',
+      };
+
+      if (userExists) {
+        final patchUri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/users?id=eq.$targetId');
+        await http.patch(
+          patchUri,
+          headers: {
+            'apikey': ApiConfig.supabasePublishableKey,
+            'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(payload),
+        ).timeout(const Duration(seconds: 8));
+      } else {
+        final postUri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/users');
+        await http.post(
+          postUri,
+          headers: {
+            'apikey': ApiConfig.supabasePublishableKey,
+            'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates',
+          },
+          body: jsonEncode(payload),
+        ).timeout(const Duration(seconds: 8));
+      }
+
+      // Link courses to this dosen in Supabase if matkulNama is specified
+      if (dosen.matkulNama != null && dosen.matkulNama!.isNotEmpty) {
+        final matkulItems = dosen.matkulNama!.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty);
+        for (final item in matkulItems) {
+          final cleanTitle = item.contains('-') ? item.split('-').last.trim() : item;
+          if (cleanTitle.isNotEmpty) {
+            final mkPatchUri = Uri.parse(
+              '${ApiConfig.supabaseUrl}/rest/v1/mata_kuliah?nama=ilike.%25${Uri.encodeComponent(cleanTitle)}%25'
+            );
+            await http.patch(
+              mkPatchUri,
+              headers: {
+                'apikey': ApiConfig.supabasePublishableKey,
+                'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+                'Content-Type': 'application/json',
+              },
+              body: jsonEncode({
+                'dosen_id': targetId,
+                'dosen_nama': dosen.nama,
+              }),
+            ).timeout(const Duration(seconds: 5));
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Direct Supabase createDosen error: $e');
     }
-    await Future.delayed(const Duration(milliseconds: 150));
+
     return dosen;
   }
 
   /// Delete Dosen / User (Cascade)
   Future<void> deleteUser(String userId) async {
-    await MockDatabase.cascadeDeleteDosen(userId);
-    if (!ApiConfig.useMockBackend) {
-      try {
-        await _httpHelper.makeOnlineRequest(
-          '/master/users.php',
-          method: 'POST',
-          body: {'action': 'delete', 'id': userId},
-        );
-      } catch (_) {}
-    }
-    await Future.delayed(const Duration(milliseconds: 150));
+    // 1. Backend Python
+    try {
+      await _httpHelper.makeOnlineRequest(
+        '/master/users.php',
+        method: 'POST',
+        body: {'action': 'delete', 'id': userId},
+      );
+    } catch (_) {}
+
+    // 2. Direct Supabase Cloud
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/users?id=eq.$userId');
+      await http.delete(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+        },
+      ).timeout(const Duration(seconds: 8));
+    } catch (_) {}
   }
 
   /// GET Master Data Gedung List
   Future<List<GedungModel>> getGedungList() async {
-    await MockDatabase.initLocalCache();
-    final filtered = MockDatabase.gedungList.where((g) =>
-        !MockDatabase.deletedGedungIds.contains(g.id) &&
-        !MockDatabase.deletedGedungIds.contains(g.nama)
-    ).toList();
-    return List.unmodifiable(filtered);
+    try {
+      final data = await _httpHelper.makeOnlineRequest('/master/gedung.php');
+      if (data is Map && data['status'] == 'success' && data['data'] != null) {
+        return (data['data'] as List).map((g) => GedungModel.fromJson(g)).toList();
+      }
+    } catch (_) {}
+
+    // Direct Supabase Cloud Fallback
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/gedung?select=*');
+      final resp = await http.get(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is List && decoded.isNotEmpty) {
+          return decoded.map((g) => GedungModel.fromJson(Map<String, dynamic>.from(g))).toList();
+        }
+      }
+    } catch (_) {}
+
+    return [];
   }
 
   /// ADD Master Data Gedung
   Future<GedungModel> addGedung(GedungModel gedung) async {
-    MockDatabase.deletedGedungIds.remove(gedung.id);
-    MockDatabase.deletedGedungIds.remove(gedung.nama);
-    MockDatabase.gedungList.removeWhere((g) => g.id == gedung.id || g.nama == gedung.nama);
-    MockDatabase.gedungList.add(gedung);
-    await MockDatabase.saveLocalGedung();
+    // 1. Backend Python
+    try {
+      await _httpHelper.makeOnlineRequest(
+        '/master/gedung.php',
+        method: 'POST',
+        body: gedung.toJson(),
+      );
+    } catch (_) {}
 
-    if (!ApiConfig.useMockBackend) {
-      try {
-        await _httpHelper.makeOnlineRequest(
-          '/master/gedung.php',
-          method: 'POST',
-          body: gedung.toJson(),
-        );
-      } catch (_) {}
-    }
-    await Future.delayed(const Duration(milliseconds: 100));
+    // 2. Direct Supabase Cloud
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/gedung');
+      await http.post(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: jsonEncode(gedung.toJson()),
+      ).timeout(const Duration(seconds: 8));
+    } catch (_) {}
+
     return gedung;
   }
 
   /// DELETE Master Data Gedung (Cascade)
   Future<void> deleteGedung(String gedungId) async {
-    await MockDatabase.cascadeDeleteGedung(gedungId);
-    if (!ApiConfig.useMockBackend) {
-      try {
-        await _httpHelper.makeOnlineRequest('/master/gedung.php?id=$gedungId', method: 'DELETE');
-        await _httpHelper.makeOnlineRequest(
-          '/master/gedung.php',
-          method: 'POST',
-          body: {'action': 'delete', 'id': gedungId},
-        );
-      } catch (_) {}
-    }
-    await Future.delayed(const Duration(milliseconds: 100));
+    // 1. Backend Python
+    try {
+      await _httpHelper.makeOnlineRequest('/master/gedung.php?id=$gedungId', method: 'DELETE');
+      await _httpHelper.makeOnlineRequest(
+        '/master/gedung.php',
+        method: 'POST',
+        body: {'action': 'delete', 'id': gedungId},
+      );
+    } catch (_) {}
+
+    // 2. Direct Supabase Cloud
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/gedung?id=eq.$gedungId');
+      await http.delete(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+        },
+      ).timeout(const Duration(seconds: 8));
+    } catch (_) {}
   }
 
   /// GET Master Data Ruangan List
   Future<List<RuanganModel>> getRuanganList() async {
-    await MockDatabase.initLocalCache();
-    final activeGedungIds = MockDatabase.gedungList.map((g) => g.id.trim()).where((id) => id.isNotEmpty).toSet();
-    final activeGedungNames = MockDatabase.gedungList.map((g) => g.nama.trim().toLowerCase()).where((n) => n.isNotEmpty).toSet();
+    try {
+      final data = await _httpHelper.makeOnlineRequest('/master/ruangan.php');
+      if (data is Map && data['status'] == 'success' && data['data'] != null) {
+        return (data['data'] as List).map((r) => RuanganModel.fromJson(r)).toList();
+      }
+    } catch (_) {}
 
-    MockDatabase.ruanganList.removeWhere((r) {
-      if (MockDatabase.deletedRuanganIds.contains(r.id) || MockDatabase.deletedRuanganIds.contains(r.nama)) return true;
-      if (MockDatabase.deletedGedungIds.contains(r.gedungId) || MockDatabase.deletedGedungIds.contains(r.gedungNama)) return true;
+    // Direct Supabase Cloud Fallback
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/ruangan?select=*');
+      final resp = await http.get(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 8));
 
-      final matchId = r.gedungId.isNotEmpty && activeGedungIds.contains(r.gedungId.trim());
-      final matchNama = r.gedungNama.isNotEmpty && activeGedungNames.contains(r.gedungNama.trim().toLowerCase());
-      return !(matchId || matchNama);
-    });
-    await MockDatabase.saveLocalRuangan();
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is List && decoded.isNotEmpty) {
+          return decoded.map((r) => RuanganModel.fromJson(Map<String, dynamic>.from(r))).toList();
+        }
+      }
+    } catch (_) {}
 
-    return List.unmodifiable(MockDatabase.ruanganList);
+    return [];
   }
 
   /// ADD Master Data Ruangan
@@ -244,6 +509,7 @@ class MasterDataApiService {
     MockDatabase.ruanganList.add(ruangan);
     await MockDatabase.saveLocalRuangan();
 
+    // 1. Backend Python
     if (!ApiConfig.useMockBackend) {
       try {
         await _httpHelper.makeOnlineRequest(
@@ -253,6 +519,28 @@ class MasterDataApiService {
         );
       } catch (_) {}
     }
+
+    // 2. Direct Supabase Cloud
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/ruangan');
+      await http.post(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: jsonEncode({
+          'id': ruangan.id,
+          'nama': ruangan.nama,
+          'gedung_id': ruangan.gedungId,
+          'kapasitas': ruangan.kapasitas,
+          'tipe_ruangan': ruangan.tipeRuangan,
+        }),
+      ).timeout(const Duration(seconds: 8));
+    } catch (_) {}
+
     await Future.delayed(const Duration(milliseconds: 100));
     return ruangan;
   }
@@ -260,6 +548,7 @@ class MasterDataApiService {
   /// DELETE Master Data Ruangan (Cascade)
   Future<void> deleteRuangan(String ruanganId) async {
     await MockDatabase.cascadeDeleteRuangan(ruanganId);
+    // 1. Backend Python
     if (!ApiConfig.useMockBackend) {
       try {
         await _httpHelper.makeOnlineRequest('/master/ruangan.php?id=$ruanganId', method: 'DELETE');
@@ -270,7 +559,92 @@ class MasterDataApiService {
         );
       } catch (_) {}
     }
+
+    // 2. Direct Supabase Cloud
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/ruangan?id=eq.$ruanganId');
+      await http.delete(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+        },
+      ).timeout(const Duration(seconds: 8));
+    } catch (_) {}
+
     await Future.delayed(const Duration(milliseconds: 150));
+  }
+
+  /// SAVE / UPDATE Master Data Mata Kuliah
+  Future<void> saveMataKuliah(Map<String, dynamic> matkul) async {
+    final mkId = (matkul['id'] ?? matkul['kode'] ?? '').toString();
+    final body = {
+      'id': mkId,
+      'nama': matkul['nama'],
+      'sks': matkul['sks'] ?? 3,
+      'jurusan_nama': matkul['jurusan'],
+      'fakultas_nama': matkul['fakultas'],
+      'dosen_id': matkul['dosenId'] ?? matkul['dosen_id'] ?? 'DOS001',
+      'dosen_nama': matkul['dosen'],
+      'kelas': matkul['kelas'],
+    };
+
+    // 1. Send to Backend Python
+    try {
+      await _httpHelper.makeOnlineRequest(
+        '/master/mata_kuliah.php',
+        method: 'POST',
+        body: body,
+      );
+    } catch (_) {}
+
+    // 2. Direct upsert to Supabase
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/mata_kuliah');
+      await http.post(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: jsonEncode({
+          'id': mkId,
+          'nama': matkul['nama'],
+          'sks': matkul['sks'] ?? 3,
+          'jurusan_id': matkul['jurusan_id'] ?? 'JUR001',
+          'jurusan_nama': matkul['jurusan'] ?? 'Teknik Informatika',
+          'fakultas_nama': matkul['fakultas'] ?? 'Fakultas Sains dan Teknologi',
+          'dosen_id': matkul['dosenId'] ?? matkul['dosen_id'] ?? 'DOS001',
+          'dosen_nama': matkul['dosen'] ?? '',
+        }),
+      ).timeout(const Duration(seconds: 8));
+    } catch (_) {}
+  }
+
+  /// DELETE Master Data Mata Kuliah
+  Future<void> deleteMataKuliah(String mkId) async {
+    // 1. Backend Python
+    try {
+      await _httpHelper.makeOnlineRequest(
+        '/master/mata_kuliah.php',
+        method: 'POST',
+        body: {'action': 'delete', 'id': mkId},
+      );
+    } catch (_) {}
+
+    // 2. Supabase Cloud
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/mata_kuliah?id=eq.$mkId');
+      await http.delete(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+        },
+      ).timeout(const Duration(seconds: 8));
+    } catch (_) {}
   }
 
   /// GET Demo Users for Role Switching

@@ -7,7 +7,7 @@ import '../../auth/view_models/auth_view_model.dart';
 import '../../availability/widgets/ajuan_pengajaran_dialogs.dart';
 import '../view_models/schedule_view_model.dart';
 
-class ScheduleConflictResolutionView extends StatelessWidget {
+class ScheduleConflictResolutionView extends StatefulWidget {
   final List<AjuanPengajaranModel> allAjuanList;
   final Set<String> selectedConflictIds;
   final bool isConflictSelectionMode;
@@ -28,13 +28,22 @@ class ScheduleConflictResolutionView extends StatelessWidget {
   });
 
   @override
+  State<ScheduleConflictResolutionView> createState() => _ScheduleConflictResolutionViewState();
+}
+
+class _ScheduleConflictResolutionViewState extends State<ScheduleConflictResolutionView> {
+  int _displayedCount = 10;
+
+  @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthViewModel>().currentUser;
     final isDekan = user?.role == 'dekan';
     final isKaProdi = user?.role == 'kajur';
     final api = context.read<ApiService>();
 
-    final allConflicts = allAjuanList.where((a) {
+    final seenConflictIds = <String>{};
+    final allConflicts = widget.allAjuanList.where((a) {
+      if (seenConflictIds.contains(a.id)) return false;
       if (a.status.startsWith('ditolak')) return false;
       final conflictInfo = api.checkBuildingConflict(a);
       final isConflict = a.status == 'bentrok_terdeteksi' ||
@@ -43,18 +52,23 @@ class ScheduleConflictResolutionView extends StatelessWidget {
           (a.status != 'disetujui_admin' && a.status != 'banding_disetujui' && a.bentrokDetail != null && a.bentrokDetail!.isNotEmpty);
       if (!isConflict) return false;
       if (isKaProdi) {
-        return a.jurusanNama == (user?.jurusanNama ?? 'Teknik Informatika');
+        if (a.jurusanNama != (user?.jurusanNama ?? 'Teknik Informatika')) return false;
+      } else if (isDekan) {
+        if (a.fakultasNama != 'Fakultas Sains & Teknologi') return false;
       }
-      if (isDekan) {
-        return a.fakultasNama == 'Fakultas Sains & Teknologi';
-      }
+      seenConflictIds.add(a.id);
       return true;
     }).toList();
 
+    final visibleConflicts = allConflicts.take(_displayedCount).toList();
+    final hasMore = allConflicts.length > visibleConflicts.length;
     final hasConflicts = allConflicts.isNotEmpty;
 
     return RefreshIndicator(
-      onRefresh: onRefresh,
+      onRefresh: () async {
+        setState(() => _displayedCount = 10);
+        await widget.onRefresh();
+      },
       color: AppColors.primary,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
@@ -137,7 +151,7 @@ class ScheduleConflictResolutionView extends StatelessWidget {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       elevation: 0,
                     ),
-                    onPressed: () => onShowBatchResolveDialog(allConflicts),
+                    onPressed: () => widget.onShowBatchResolveDialog(allConflicts),
                     child: const Text(
                       'Sesuaikan',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
@@ -191,153 +205,119 @@ class ScheduleConflictResolutionView extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-
-          if (allConflicts.isEmpty)
+          const SizedBox(height: 12),
+          if (!hasConflicts)
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(32),
+              margin: const EdgeInsets.only(top: 20),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppRadius.md),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              child: const Row(
-                children: [
-                  Icon(Icons.check_circle_outline_rounded, color: Color(0xFF10B981), size: 18),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Tidak ada konflik. Seluruh jadwal aman.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF475569)),
-                    ),
-                  ),
+              child: Column(
+                children: const [
+                  Icon(Icons.check_circle_outline_rounded, size: 52, color: AppColors.success),
+                  SizedBox(height: 12),
+                  Text('Semua Pengajuan Bebas Bentrok', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                  SizedBox(height: 4),
+                  Text('Seluruh jadwal perkuliahan dosen telah tervalidasi dan siap diterbitkan.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                 ],
               ),
             )
-          else
-            ...allConflicts.map((aj) {
-              final isSelected = selectedConflictIds.contains(aj.id);
+          else ...[
+            ...visibleConflicts.map((aj) {
+              final isSelected = widget.selectedConflictIds.contains(aj.id);
+              final conflictInfo = api.checkBuildingConflict(aj);
+              final bentrokPesan = aj.bentrokDetail ?? conflictInfo['message'] ?? 'Konflik jadwal mengajar terdeteksi.';
               final suggestion = api.findSmartAlternativeSlot(aj);
+
               return Container(
-                margin: const EdgeInsets.only(bottom: 10),
+                margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
-                    width: isSelected ? 1.8 : 1.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isSelected
-                          ? AppColors.primary.withValues(alpha: 0.12)
-                          : const Color(0x06DC2626),
-                      blurRadius: isSelected ? 6 : 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
+                  color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0), width: isSelected ? 1.5 : 1),
+                  boxShadow: const [BoxShadow(color: Color(0x04000000), blurRadius: 4, offset: Offset(0, 1))],
                 ),
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => onConflictTap(aj.id),
-                    onLongPress: () => onConflictLongPress(aj.id),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    onTap: () => widget.onConflictTap(aj.id),
+                    onLongPress: () => widget.onConflictLongPress(aj.id),
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (isConflictSelectionMode) ...[
-                                Container(
-                                  margin: const EdgeInsets.only(right: 8),
+                              if (widget.isConflictSelectionMode)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8, top: 2),
                                   child: Icon(
-                                    isSelected
-                                        ? Icons.check_circle_rounded
-                                        : Icons.radio_button_unchecked_rounded,
-                                    size: 18,
+                                    isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                                     color: isSelected ? AppColors.primary : const Color(0xFF94A3B8),
+                                    size: 20,
                                   ),
                                 ),
-                              ],
                               Expanded(
-                                child: Text(
-                                  aj.mataKuliahNama,
-                                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(aj.mataKuliahNama, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                    const SizedBox(height: 2),
+                                    Text('${aj.dosenNama} • ${aj.jurusanNama}', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                                  ],
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: aj.status == 'menunggu_banding' ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: aj.status == 'menunggu_banding' ? const Color(0xFFFDE68A) : const Color(0xFFFECACA)),
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFFECACA)),
                                 ),
-                                child: Text(
-                                  aj.status == 'menunggu_banding' ? 'Banding Dosen' : 'Bentrok Terdeteksi',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: aj.status == 'menunggu_banding' ? const Color(0xFFB45309) : const Color(0xFFDC2626),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 5),
-                          Row(
-                            children: [
-                              const Icon(Icons.person_outline_rounded, size: 14, color: Color(0xFF475569)),
-                              const SizedBox(width: 5),
-                              Expanded(
-                                child: Text(
-                                  '${aj.dosenNama} • ${aj.fakultasNama} (Kelas ${aj.kelasNama})',
-                                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569)),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.warning_amber_rounded, size: 12, color: AppColors.error),
+                                    SizedBox(width: 4),
+                                    Text('Bentrok', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.error)),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: aj.status == 'menunggu_banding' ? const Color(0xFFFFFBEB) : const Color(0xFFFEF2F2),
+                              color: const Color(0xFFFFFBEB),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: aj.status == 'menunggu_banding' ? const Color(0xFFFDE68A) : const Color(0xFFFECACA)),
+                              border: Border.all(color: const Color(0xFFFDE68A)),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (aj.status == 'menunggu_banding') ...[
-                                  Text(
-                                    'Permohonan Dosen: ${aj.preferensiBandingHari ?? aj.hari}, ${aj.preferensiBandingJam ?? aj.waktuFormatted}',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
-                                  ),
-                                  if (aj.alasanBanding != null && aj.alasanBanding!.isNotEmpty) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Alasan Banding: ${aj.alasanBanding}',
-                                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF78350F)),
-                                    ),
+                                Row(
+                                  children: const [
+                                    Icon(Icons.info_outline_rounded, color: Color(0xFFB45309), size: 14),
+                                    SizedBox(width: 4),
+                                    Text('Detail Bentrok Terdeteksi:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
                                   ],
-                                ] else ...[
+                                ),
+                                const SizedBox(height: 2),
+                                Text(bentrokPesan, style: const TextStyle(fontSize: 11, color: Color(0xFF78350F))),
+                                if (aj.ruanganNama.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
                                   Text(
-                                    'Jadwal Bentrok: ${aj.hari}, ${aj.waktuFormatted} di ${aj.ruanganNama} (${aj.gedungNama})',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF991B1B)),
+                                    'Posisi Pengajuan: ${aj.hari}, ${aj.jamMulai}-${aj.jamSelesai} di ${aj.ruanganNama} (${aj.gedungNama})',
+                                    style: const TextStyle(fontSize: 10.5, fontStyle: FontStyle.italic, color: Color(0xFF92400E)),
                                   ),
-                                  if (aj.bentrokDetail != null && aj.bentrokDetail!.isNotEmpty) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      aj.bentrokDetail!,
-                                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF7F1D1D)),
-                                    ),
-                                  ],
                                 ],
                               ],
                             ),
@@ -358,10 +338,7 @@ class ScheduleConflictResolutionView extends StatelessWidget {
                                   children: const [
                                     Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF0F766E), size: 14),
                                     SizedBox(width: 4),
-                                    Text(
-                                      'Rekomendasi Penyesuaian',
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
-                                    ),
+                                    Text('Rekomendasi Penyesuaian', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
                                   ],
                                 ),
                                 const SizedBox(height: 2),
@@ -376,7 +353,7 @@ class ScheduleConflictResolutionView extends StatelessWidget {
                               ],
                             ),
                           ),
-                          if (!isConflictSelectionMode) ...[
+                          if (!widget.isConflictSelectionMode) ...[
                             const SizedBox(height: 8),
                             Row(
                               children: [
@@ -400,7 +377,7 @@ class ScheduleConflictResolutionView extends StatelessWidget {
                                           } else {
                                             await api.adminApproveFinalAjuan(aj.id, updatedData: updated);
                                           }
-                                          await onRefresh();
+                                          await widget.onRefresh();
                                           if (context.mounted) {
                                             await context.read<ScheduleViewModel>().loadScheduleData();
                                           }
@@ -445,7 +422,7 @@ class ScheduleConflictResolutionView extends StatelessWidget {
                                       } else {
                                         await api.adminApproveFinalAjuan(aj.id, updatedData: updated);
                                       }
-                                      await onRefresh();
+                                      await widget.onRefresh();
                                       if (context.mounted) {
                                         await context.read<ScheduleViewModel>().loadScheduleData();
                                         messenger.showSnackBar(
@@ -470,6 +447,36 @@ class ScheduleConflictResolutionView extends StatelessWidget {
                 ),
               );
             }),
+            if (hasMore)
+              Padding(
+                padding: const EdgeInsets.only(top: 14, bottom: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _displayedCount += 10;
+                      });
+                    },
+                    icon: const Icon(Icons.expand_more_rounded, size: 20),
+                    label: Text(
+                      'Muat 10 Konflik Lagi (${allConflicts.length - visibleConflicts.length} Tersisa)',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.2),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );

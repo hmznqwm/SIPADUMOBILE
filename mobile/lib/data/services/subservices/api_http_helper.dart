@@ -15,6 +15,7 @@ class ApiException implements Exception {
 }
 
 class ApiHttpHelper {
+  static String? currentAuthToken;
   DateTime? _lastConnectivityCheck;
   bool _cachedConnectivity = true;
 
@@ -59,6 +60,9 @@ class ApiHttpHelper {
         'Accept': 'application/json',
         'Connection': 'close',
       };
+      if (currentAuthToken != null && currentAuthToken!.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $currentAuthToken';
+      }
       if (body != null || method.toUpperCase() == 'POST' || method.toUpperCase() == 'PUT') {
         headers['Content-Type'] = 'application/json';
       }
@@ -117,13 +121,28 @@ class ApiHttpHelper {
     } else if (response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 403) {
       try {
         final data = jsonDecode(response.body);
+        String? msg;
+        if (data is Map) {
+          if (data['message'] != null) {
+            msg = data['message'].toString();
+          } else if (data['detail'] != null) {
+            if (data['detail'] is Map && data['detail']['message'] != null) {
+              msg = data['detail']['message'].toString();
+            } else if (data['detail'] is String) {
+              msg = data['detail'].toString();
+            }
+          }
+        }
+        // Detect unregistered account from message or status code 403
+        final bool isUnregistered = response.statusCode == 403 ||
+            (msg != null && (msg.contains('tidak terdaftar') || msg.contains('tidak ditemukan') || msg.contains('belum terdaftar')));
         throw ApiException(
-          response.statusCode == 403 ? 'UNREGISTERED' : 'INVALID_CREDENTIALS',
-          data['message'] ?? 'Kredensial atau data tidak valid.',
+          isUnregistered ? 'UNREGISTERED' : 'INVALID_CREDENTIALS',
+          msg ?? 'Nomor Induk / Email tidak ditemukan atau kata sandi salah.',
         );
       } catch (e) {
         if (e is ApiException) rethrow;
-        throw const ApiException('INVALID_CREDENTIALS', 'Akses ditolak atau akun tidak terdaftar.');
+        throw const ApiException('INVALID_CREDENTIALS', 'Nomor Induk / Email tidak ditemukan atau kata sandi salah.');
       }
     } else {
       throw ApiException(

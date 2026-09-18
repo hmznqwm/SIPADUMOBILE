@@ -60,7 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       onRefresh: () => viewModel.loadDashboardData(),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         child: roleBody,
       ),
     );

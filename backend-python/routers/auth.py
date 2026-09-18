@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from core.database import get_db
 from core.config import SUPABASE_URL, SB_HEADERS
+from core.security import (
+    create_access_token, get_current_user, validate_password_strength,
+    sanitize_supabase_param
+)
 from models.models import User, PasswordReset
 from schemas.schemas import LoginRequest, GoogleLoginRequest, ChangePasswordRequest, ForgotPasswordRequest, ResetPasswordRequest
 import bcrypt
@@ -11,13 +15,17 @@ import secrets
 import requests
 import json
 import random
+import logging
+
+logger = logging.getLogger("smartschedule.auth")
 
 def patch_user_in_supabase(user_id_or_email: str, data: dict):
     try:
-        url = f"{SUPABASE_URL}/rest/v1/users?or=(id.eq.{user_id_or_email},email.ilike.{user_id_or_email})"
+        clean = sanitize_supabase_param(user_id_or_email)
+        url = f"{SUPABASE_URL}/rest/v1/users?or=(id.eq.{clean},email.ilike.{clean})"
         requests.patch(url, headers=SB_HEADERS, json=data, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to patch user in Supabase: {e}")
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -71,7 +79,9 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     # 1. Ambil data user langsung dari Supabase REST API (Source of Truth)
     user = None
     try:
-        url = f"{SUPABASE_URL}/rest/v1/users?or=(id.eq.{ident},id.ilike.{ident},email.eq.{ident},email.ilike.{clean_ident})"
+        safe_ident = sanitize_supabase_param(ident)
+        safe_clean = sanitize_supabase_param(clean_ident)
+        url = f"{SUPABASE_URL}/rest/v1/users?or=(id.eq.{safe_ident},id.ilike.{safe_ident},email.eq.{safe_ident},email.ilike.{safe_clean})"
         resp = requests.get(url, headers=SB_HEADERS, timeout=5)
         if resp.status_code == 200:
             users_data = resp.json()
@@ -90,8 +100,8 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
                     is_priority=u.get("is_priority"),
                     avatar_url=u.get("avatar_url")
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Supabase login lookup failed: {e}")
 
     # 2. Fallback ke SQLite lokal jika koneksi Supabase Cloud bermasalah
     if not user:
@@ -118,7 +128,13 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         )
 
     user_data = format_user_data(user)
-    token = f"sipadu_sec_token_{secrets.token_hex(24)}"
+
+    # Generate JWT token yang valid dan bisa diverifikasi
+    token = create_access_token(
+        user_id=user.id,
+        role=user.role,
+        email=user.email
+    )
 
     return {
         "status": "success",
@@ -166,7 +182,13 @@ def google_login(req: GoogleLoginRequest, db: Session = Depends(get_db)):
         )
 
     user_data = format_user_data(user)
-    token = f"sipadu_token_{secrets.token_hex(16)}"
+
+    # Generate JWT token
+    token = create_access_token(
+        user_id=user.id,
+        role=user.role,
+        email=user.email
+    )
 
     return {
         "status": "success",
@@ -180,40 +202,20 @@ def google_login(req: GoogleLoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/change_password")
 @router.post("/change_password.php")
-def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
-    ident = (req.email or req.id or "").strip()
-    user = db.query(User).filter((User.email.ilike(ident)) | (User.id.ilike(ident))).first()
-
-    # If not found locally, query Supabase
-    if not user:
-        try:
-            r = requests.get(
-                f"{SUPABASE_URL}/rest/v1/users?or=(email.ilike.{ident},id.ilike.{ident})&select=*",
-                headers=SB_HEADERS,
-                timeout=5
-            )
-            if r.status_code == 200 and r.json():
-                sb_u = r.json()[0]
-                user = User(
-                    id=sb_u["id"],
-                    nama=sb_u["nama"],
-                    email=sb_u["email"],
-                    password=sb_u.get("password") or "password123",
-                    role=sb_u.get("role") or "dosen",
-                    jurusan_id=sb_u.get("jurusan_id"),
-                    jurusan_nama=sb_u.get("jurusan_nama"),
-                    fakultas_nama=sb_u.get("fakultas_nama")
-                )
-                db.add(user)
-                db.commit()
-        except Exception:
-            pass
+def change_password(req: ChangePasswordRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Use authenticated user instead of trusting client-provided identity
+    user = db.query(User).filter(User.id == current_user.id).first()
 
     if not user:
         raise HTTPException(status_code=404, detail={"status": "error", "message": "Pengguna tidak ditemukan."})
 
     if not verify_password(req.old_password, user.password):
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Kata sandi lama tidak sesuai."})
+
+    # Validate password strength
+    pw_error = validate_password_strength(req.new_password)
+    if pw_error:
+        raise HTTPException(status_code=400, detail={"status": "error", "message": pw_error})
 
     user.password = get_password_hash(req.new_password)
     db.commit()
@@ -222,7 +224,7 @@ def change_password(req: ChangePasswordRequest, db: Session = Depends(get_db)):
 
 @router.post("/forgot_password")
 @router.post("/forgot_password.php")
-def forgot_password(req: ForgotPasswordRequest):
+def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     email = (req.email or "").strip()
     nidn = (req.nidn or req.nid or req.nip or "").strip()
 
@@ -234,7 +236,8 @@ def forgot_password(req: ForgotPasswordRequest):
     user_email = None
 
     try:
-        url = f"{SUPABASE_URL}/rest/v1/users?email=ilike.{email}&select=id,nama,email"
+        safe_email = sanitize_supabase_param(email)
+        url = f"{SUPABASE_URL}/rest/v1/users?email=ilike.{safe_email}&select=id,nama,email"
         res = requests.get(url, headers=SB_HEADERS, timeout=5)
         if res.status_code == 200 and res.json():
             res_data = res.json()
@@ -244,7 +247,7 @@ def forgot_password(req: ForgotPasswordRequest):
                 user_nama = str(sb_u.get("nama") or "").strip()
                 user_email = str(sb_u.get("email") or "").strip()
     except Exception as e:
-        print(f"[FORGOT PW] Supabase query error: {e}")
+        logger.warning(f"[FORGOT PW] Supabase query error: {e}")
 
     if not user_id or not user_email:
         raise HTTPException(status_code=400, detail={"status": "error", "message": f"Alamat Email '{email}' tidak terdaftar pada sistem SIPADU."})
@@ -255,14 +258,37 @@ def forgot_password(req: ForgotPasswordRequest):
             detail={"status": "error", "message": f"Kombinasi NID/NIP dan Email tidak cocok! NID/NIP '{nidn}' bukan milik email '{email}'."}
         )
 
-    token_val = f"tok_{random.randint(10000000, 99999999)}"
-    otp_val = f"{random.randint(100000, 999999)}"
+    # Generate secure OTP and token
+    token_val = secrets.token_urlsafe(32)
+    otp_val = f"{random.SystemRandom().randint(100000, 999999)}"
+
+    # Store OTP/Token in database with expiry (15 minutes)
+    expiry = datetime.now(timezone.utc) + timedelta(minutes=15)
+    existing = db.query(PasswordReset).filter(PasswordReset.email == user_email).first()
+    if existing:
+        existing.token = token_val
+        existing.otp = otp_val
+        existing.expires_at = expiry
+        existing.created_at = datetime.now(timezone.utc)
+    else:
+        reset_record = PasswordReset(
+            email=user_email,
+            token=token_val,
+            otp=otp_val,
+            expires_at=expiry
+        )
+        db.add(reset_record)
+    db.commit()
+
+    # TODO: Kirim OTP via email menggunakan SMTP service (Resend, Mailgun, dll.)
+    # Untuk saat ini, OTP masih dikembalikan di response untuk development
+    # Di production, HAPUS "otp" dari response dan kirim via email
 
     return {
         "status": "success",
         "message": f"Kode OTP pemulihan kata sandi telah dikirimkan ke {user_email}.",
         "token": token_val,
-        "otp": otp_val,
+        "otp": otp_val,  # TODO: HAPUS di production — kirim via email
         "email": user_email,
         "nama": user_nama,
         "nidn": user_id
@@ -270,7 +296,7 @@ def forgot_password(req: ForgotPasswordRequest):
 
 @router.post("/reset_password")
 @router.post("/reset_password.php")
-def reset_password(req: ResetPasswordRequest):
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
     email = (req.email or "").strip()
     otp = (req.otp or "").strip()
     token = (req.token or "").strip()
@@ -279,8 +305,50 @@ def reset_password(req: ResetPasswordRequest):
     if not email or not new_password or (not otp and not token):
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Email, OTP/Token, dan password baru wajib diisi."})
 
+    # Validate password strength
+    pw_error = validate_password_strength(new_password)
+    if pw_error:
+        raise HTTPException(status_code=400, detail={"status": "error", "message": pw_error})
+
+    # Verify OTP/Token from database
+    reset_record = db.query(PasswordReset).filter(PasswordReset.email.ilike(email)).first()
+
+    if not reset_record:
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "error", "message": "Tidak ada permintaan reset password untuk email ini. Silakan gunakan fitur 'Lupa Kata Sandi' terlebih dahulu."}
+        )
+
+    # Check expiry
+    if reset_record.expires_at and reset_record.expires_at < datetime.now(timezone.utc):
+        db.delete(reset_record)
+        db.commit()
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "error", "message": "Kode OTP sudah kedaluwarsa. Silakan minta kode baru."}
+        )
+
+    # Verify OTP or Token matches
+    otp_match = otp and reset_record.otp == otp
+    token_match = token and reset_record.token == token
+    if not otp_match and not token_match:
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "error", "message": "Kode OTP atau token tidak valid. Silakan periksa kembali."}
+        )
+
+    # Update password
     hashed = get_password_hash(new_password)
     patch_user_in_supabase(email, {"password": hashed})
+
+    # Also update local SQLite if user exists
+    local_user = db.query(User).filter(User.email.ilike(email)).first()
+    if local_user:
+        local_user.password = hashed
+    
+    # Delete used reset record
+    db.delete(reset_record)
+    db.commit()
 
     return {
         "status": "success",

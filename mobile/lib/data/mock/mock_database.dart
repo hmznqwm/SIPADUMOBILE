@@ -71,7 +71,7 @@ class MockDatabase {
         demoUsers.removeWhere((u) => deletedUserIds.contains(u.id));
       }
       // Pastikan SEMUA user hardcoded (sistem + demo dosen) SELALU ada dan tidak bisa dihapus permanen
-      final _hardcoded = [
+      final hardcoded = [
         const UserModel(id: 'DSN001', nama: 'Dr. Ahmad Fauzi, M.Kom.', email: 'ahmad.fauzi@university.ac.id', role: 'dosen', jurusanId: 'JUR001', jurusanNama: 'Teknik Informatika', fakultasNama: 'Fakultas Sains & Teknologi', isPriority: true),
         const UserModel(id: 'DSN002', nama: 'Siti Nurhaliza, S.T., M.T.', email: 'siti.nurhaliza@university.ac.id', role: 'dosen', jurusanId: 'JUR001', jurusanNama: 'Teknik Informatika', fakultasNama: 'Fakultas Sains & Teknologi'),
         const UserModel(id: 'DSN003', nama: 'Prof. Budi Santoso, Ph.D.', email: 'budi.santoso@university.ac.id', role: 'dosen', jurusanId: 'JUR002', jurusanNama: 'Sistem Informasi', fakultasNama: 'Fakultas Sains & Teknologi'),
@@ -81,11 +81,11 @@ class MockDatabase {
         const UserModel(id: 'ADM002', nama: 'Hamizan Qowiem (Admin)', email: 'hamizanqowiem4@gmail.com', role: 'admin', jurusanId: 'GLOBAL', jurusanNama: 'Administrator Sistem', fakultasNama: 'Universitas'),
       ];
       // ID yang tidak boleh dihapus permanen
-      const _protectedIds = {'DSN001', 'DSN002', 'DSN003', 'KJR001', 'DKN001', 'ADM001', 'ADM002'};
+      const protectedIds = {'DSN001', 'DSN002', 'DSN003', 'KJR001', 'DKN001', 'ADM001', 'ADM002'};
       // Hapus dari deletedUserIds agar tidak terblokir
-      deletedUserIds.removeAll(_protectedIds);
+      deletedUserIds.removeAll(protectedIds);
       // Restore/update setiap user hardcoded (replace jika sudah ada, tambah jika belum ada)
-      for (final sys in _hardcoded) {
+      for (final sys in hardcoded) {
         demoUsers.removeWhere((u) => u.id == sys.id); // hapus versi lama
         demoUsers.add(sys); // tambahkan versi terbaru
       }
@@ -312,7 +312,9 @@ class MockDatabase {
               deletedRuanganIds.contains(a.ruanganNama) ||
               deletedMatkulIds.contains(a.mataKuliahId) || deletedMatkulIds.contains(a.mataKuliahNama) ||
               deletedUserIds.contains(a.dosenId) || deletedUserIds.contains(a.dosenNama) ||
-              deletedFakultasIds.contains(a.fakultasNama)) return false;
+              deletedFakultasIds.contains(a.fakultasNama)) {
+            return false;
+          }
 
           final gNama = a.gedungNama.trim().toLowerCase();
           final rNama = a.ruanganNama.trim().toLowerCase();
@@ -346,11 +348,13 @@ class MockDatabase {
               deletedRuanganIds.contains(j.ruanganNama) ||
               deletedMatkulIds.contains(j.mataKuliahId) || deletedMatkulIds.contains(j.mataKuliahNama) ||
               deletedUserIds.contains(j.dosenId) || deletedUserIds.contains(j.dosenNama) ||
-              deletedFakultasIds.contains(j.fakultasNama)) return false;
+              deletedFakultasIds.contains(j.fakultasNama)) {
+            return false;
+          }
 
-          final gNama = (j.gedungNama ?? '').trim().toLowerCase();
-          final rNama = (j.ruanganNama ?? '').trim().toLowerCase();
-          final mNama = (j.mataKuliahNama ?? '').trim().toLowerCase();
+          final gNama = j.gedungNama.trim().toLowerCase();
+          final rNama = j.ruanganNama.trim().toLowerCase();
+          final mNama = j.mataKuliahNama.trim().toLowerCase();
 
           final isLegacy = gNama.contains('habibie') || gNama.contains('hatta') || gNama.contains('soekarno') ||
                            rNama.contains('r.b-201') || mNama.contains('pemrograman web & mobile lanjut') ||
@@ -365,17 +369,17 @@ class MockDatabase {
           ..addAll(loaded);
       } else {
         jadwalFinal.removeWhere((j) {
-          final gNama = (j.gedungNama ?? '').trim().toLowerCase();
-          final rNama = (j.ruanganNama ?? '').trim().toLowerCase();
-          final mNama = (j.mataKuliahNama ?? '').trim().toLowerCase();
+          final gNama = j.gedungNama.trim().toLowerCase();
+          final rNama = j.ruanganNama.trim().toLowerCase();
+          final mNama = j.mataKuliahNama.trim().toLowerCase();
           return gNama.contains('habibie') || gNama.contains('hatta') || gNama.contains('soekarno') ||
                  rNama.contains('r.b-201') || mNama.contains('pemrograman web & mobile lanjut') ||
                  mNama.contains('akuntansi keuangan menengah');
         });
         jadwalGlobalMaster.removeWhere((j) {
-          final gNama = (j.gedungNama ?? '').trim().toLowerCase();
-          final rNama = (j.ruanganNama ?? '').trim().toLowerCase();
-          final mNama = (j.mataKuliahNama ?? '').trim().toLowerCase();
+          final gNama = j.gedungNama.trim().toLowerCase();
+          final rNama = j.ruanganNama.trim().toLowerCase();
+          final mNama = j.mataKuliahNama.trim().toLowerCase();
           return gNama.contains('habibie') || gNama.contains('hatta') || gNama.contains('soekarno') ||
                  rNama.contains('r.b-201') || mNama.contains('pemrograman web & mobile lanjut') ||
                  mNama.contains('akuntansi keuangan menengah');

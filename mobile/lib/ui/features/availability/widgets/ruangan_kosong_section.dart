@@ -25,6 +25,7 @@ class _RuanganKosongSectionState extends State<RuanganKosongSection> {
   String _ruanganDayFilter = 'Semua';
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  int _displayedCount = 10;
 
   @override
   void dispose() {
@@ -50,6 +51,8 @@ class _RuanganKosongSectionState extends State<RuanganKosongSection> {
           kode.contains(query) ||
           fasilitas.contains(query);
     }).toList();
+
+    final visibleRooms = filteredRooms.take(_displayedCount).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,7 +106,10 @@ class _RuanganKosongSectionState extends State<RuanganKosongSection> {
                 ),
                 child: TextField(
                   controller: _searchController,
-                  onChanged: (val) => setState(() => _searchQuery = val),
+                  onChanged: (val) => setState(() {
+                    _searchQuery = val;
+                    _displayedCount = 10;
+                  }),
                   style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF0F172A),
@@ -134,7 +140,10 @@ class _RuanganKosongSectionState extends State<RuanganKosongSection> {
                             ),
                             onPressed: () {
                               _searchController.clear();
-                              setState(() => _searchQuery = '');
+                              setState(() {
+                                _searchQuery = '';
+                                _displayedCount = 10;
+                              });
                             },
                           )
                         : null,
@@ -210,7 +219,10 @@ class _RuanganKosongSectionState extends State<RuanganKosongSection> {
                     ],
                     onChanged: (val) {
                       if (val != null) {
-                        setState(() => _ruanganDayFilter = val);
+                        setState(() {
+                          _ruanganDayFilter = val;
+                          _displayedCount = 10;
+                        });
                       }
                     },
                   ),
@@ -249,9 +261,9 @@ class _RuanganKosongSectionState extends State<RuanganKosongSection> {
               ],
             ),
           )
-        else
+        else ...[
           Column(
-            children: filteredRooms.map((r) {
+            children: visibleRooms.map((r) {
               final days = (r['hariKosong'] as List<String>? ?? []);
               final bool isAvailToday = _ruanganDayFilter == 'Semua' ||
                   days.contains(_ruanganDayFilter);
@@ -282,43 +294,52 @@ class _RuanganKosongSectionState extends State<RuanganKosongSection> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.meeting_room_rounded,
-                                  color: AppColors.primary,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    r['nama'],
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0F172A),
-                                    ),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  Text(
-                                    '${r['gedung']} • ${r['lantai']}',
-                                    style: const TextStyle(
-                                      fontSize: 11.5,
-                                      color: Color(0xFF64748B),
-                                    ),
+                                  child: const Icon(
+                                    Icons.meeting_room_rounded,
+                                    color: AppColors.primary,
+                                    size: 20,
                                   ),
-                                ],
-                              ),
-                            ],
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        r['nama'],
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        '${r['gedung']} • ${r['lantai']}',
+                                        style: const TextStyle(
+                                          fontSize: 11.5,
+                                          color: Color(0xFF64748B),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -343,7 +364,9 @@ class _RuanganKosongSectionState extends State<RuanganKosongSection> {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      Row(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -362,7 +385,6 @@ class _RuanganKosongSectionState extends State<RuanganKosongSection> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 7,
@@ -425,6 +447,37 @@ class _RuanganKosongSectionState extends State<RuanganKosongSection> {
               );
             }).toList(),
           ),
+
+          if (filteredRooms.length > _displayedCount)
+            Padding(
+              padding: const EdgeInsets.only(top: 14, bottom: 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _displayedCount += 10;
+                    });
+                  },
+                  icon: const Icon(Icons.expand_more_rounded, size: 20),
+                  label: Text(
+                    'Muat 10 Ruangan Lagi (${filteredRooms.length - _displayedCount} Tersisa)',
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                    side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ],
     );
   }

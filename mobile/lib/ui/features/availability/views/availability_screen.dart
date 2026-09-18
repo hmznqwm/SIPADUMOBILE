@@ -16,7 +16,6 @@ import '../widgets/dekan_availability_tab.dart';
 import '../widgets/dosen_ajuan_tab.dart';
 import '../widgets/dosen_matrix_tab.dart';
 import '../widgets/kaprodi_availability_tab.dart';
-import '../widgets/ruangan_kosong_section.dart';
 
 class AvailabilityScreen extends StatefulWidget {
   const AvailabilityScreen({super.key});

@@ -40,6 +40,7 @@ class KaProdiAvailabilityTab extends StatefulWidget {
 
 class _KaProdiAvailabilityTabState extends State<KaProdiAvailabilityTab> {
   int _kajurSelectedSubTab = 0; // 0: Ruangan Kosong, 1: Pengajuan Dosen
+  int _displayedCount = 10;
   String _kajurStatusFilter = 'Semua';
   String _kajurSearchQuery = '';
   final TextEditingController _kajurSearchController = TextEditingController();
@@ -100,7 +101,7 @@ class _KaProdiAvailabilityTabState extends State<KaProdiAvailabilityTab> {
       onRefresh: widget.onRefresh,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -629,23 +630,53 @@ class _KaProdiAvailabilityTabState extends State<KaProdiAvailabilityTab> {
                     ],
                   ),
                 )
-              else
+              else ...[
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredAjuan.length,
+                  itemCount: filteredAjuan.length > _displayedCount ? _displayedCount : filteredAjuan.length,
                   itemBuilder: (context, index) {
                     final aj = filteredAjuan[index];
                     return KajurAjuanCard(
-                    aj: aj,
-                    api: api,
-                    selectedAjuanIds: widget.selectedAjuanIds,
-                    onAjuanTap: widget.onAjuanTap,
-                    onAjuanLongPress: widget.onAjuanLongPress,
-                    onRefresh: widget.onRefresh,
-                  );
-                },
-              ),
+                      aj: aj,
+                      api: api,
+                      selectedAjuanIds: widget.selectedAjuanIds,
+                      onAjuanTap: widget.onAjuanTap,
+                      onAjuanLongPress: widget.onAjuanLongPress,
+                      onRefresh: widget.onRefresh,
+                    );
+                  },
+                ),
+                if (filteredAjuan.length > _displayedCount)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 14, bottom: 8),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _displayedCount += 10;
+                          });
+                        },
+                        icon: const Icon(Icons.expand_more_rounded, size: 20),
+                        label: Text(
+                          'Muat 10 Ajuan Lagi (${filteredAjuan.length - _displayedCount} Tersisa)',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.2),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ],
             const SizedBox(height: 16),
           ],

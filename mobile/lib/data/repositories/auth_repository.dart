@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user_model.dart';
 import '../services/api_service.dart';
+import '../services/subservices/api_http_helper.dart';
 
 class AuthRepository {
   static const String _userSessionKey = 'saved_user_session';
@@ -22,11 +23,13 @@ class AuthRepository {
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final Map<String, dynamic> map = jsonDecode(jsonStr);
         var user = UserModel.fromJson(map);
+        // Role ditentukan sepenuhnya oleh database server, bukan client-side logic
         final savedAvatar = prefs.getString('user_avatar_${user.id}');
         if (savedAvatar != null && savedAvatar.isNotEmpty) {
           user = user.copyWith(avatarPath: savedAvatar);
         }
         _currentUser = user;
+        ApiHttpHelper.currentAuthToken = user.token;
         return _currentUser;
       }
     } catch (e) {
@@ -92,6 +95,7 @@ class AuthRepository {
   /// Menghapus data user login dari SharedPreferences saat logout
   Future<void> _clearSession() async {
     try {
+      ApiHttpHelper.currentAuthToken = null;
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_userSessionKey);
     } catch (e) {
@@ -109,6 +113,7 @@ class AuthRepository {
       }
     } catch (_) {}
     _currentUser = user;
+    ApiHttpHelper.currentAuthToken = user.token;
     await _saveSession(user);
     return user;
   }
@@ -133,6 +138,7 @@ class AuthRepository {
       }
     } catch (_) {}
     _currentUser = user;
+    ApiHttpHelper.currentAuthToken = user.token;
     await _saveSession(user);
     return user;
   }
@@ -185,6 +191,7 @@ class AuthRepository {
       }
     } catch (_) {}
     _currentUser = newUser;
+    ApiHttpHelper.currentAuthToken = newUser.token;
     await _saveSession(newUser);
   }
 }

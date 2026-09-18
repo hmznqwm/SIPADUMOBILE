@@ -39,7 +39,7 @@ class ProfileScreen extends StatelessWidget {
     final initial = (user?.nama.isNotEmpty == true) ? user!.nama[0].toUpperCase() : 'U';
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
       child: Column(
         children: [
           // ── Card Profile Principal ──
@@ -143,7 +143,9 @@ class ProfileScreen extends StatelessWidget {
                 _buildDetailTile(
                   icon: Icons.badge_outlined,
                   label: 'Nomor Induk / ID',
-                  value: user?.id ?? '-',
+                  value: (user?.role == 'admin' || (user?.id.toUpperCase().startsWith('GGL_') ?? false))
+                      ? 'ADM001'
+                      : (user?.id ?? '-'),
                 ),
                 const Divider(height: 1, indent: 56, endIndent: 16),
                 _buildDetailTile(

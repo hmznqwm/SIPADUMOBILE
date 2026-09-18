@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../../../../config/constants.dart';
 import '../../../../data/mock/mock_database.dart';
+import '../../../../data/models/ajuan_pengajaran_model.dart';
 import '../../../../data/models/gedung_model.dart';
+import '../../../../data/models/jadwal_model.dart';
 import '../../../../data/models/ruangan_model.dart';
 import '../../../../data/models/user_model.dart';
 
@@ -13,12 +15,18 @@ class AdminStatCards extends StatelessWidget {
   final List<GedungModel> gedungList;
   final List<RuanganModel> ruanganList;
   final List<UserModel> allUsersList;
+  final List<dynamic> allMatkulList;
+  final List<AjuanPengajaranModel> allAjuanList;
+  final List<JadwalModel> jadwalList;
 
   const AdminStatCards({
     super.key,
     required this.gedungList,
     required this.ruanganList,
     required this.allUsersList,
+    this.allMatkulList = const [],
+    this.allAjuanList = const [],
+    this.jadwalList = const [],
   });
 
   @override
@@ -28,40 +36,56 @@ class AdminStatCards extends StatelessWidget {
         .length;
     final totalDosenCount = dosenPengajarCount;
 
-    final effectiveGedungList = gedungList.isNotEmpty ? gedungList : MockDatabase.gedungList;
-    final activeGedungIds = effectiveGedungList.map((g) => g.id.trim()).where((id) => id.isNotEmpty).toSet();
-    final activeGedungNames = effectiveGedungList.map((g) => g.nama.trim().toLowerCase()).where((n) => n.isNotEmpty).toSet();
+    final totalGedungCount = gedungList.length;
+    final totalRuanganCount = ruanganList.length;
 
-    final sourceRuanganList = ruanganList.isNotEmpty ? ruanganList : MockDatabase.ruanganList;
-    final effectiveRuanganList = sourceRuanganList.where((r) {
-      final rid = r.id.trim().toUpperCase();
-      if (!rid.startsWith('RNG_')) return false;
-      if (MockDatabase.deletedRuanganIds.contains(r.id) || MockDatabase.deletedRuanganIds.contains(r.nama)) return false;
-      if (MockDatabase.deletedGedungIds.contains(r.gedungId) || MockDatabase.deletedGedungIds.contains(r.gedungNama)) return false;
+    final fakultasSet = <String>{};
+    final prodiSet = <String>{};
+    for (final u in allUsersList) {
+      if (u.fakultasNama.isNotEmpty) fakultasSet.add(u.fakultasNama);
+      if (u.jurusanNama.isNotEmpty) prodiSet.add(u.jurusanNama);
+    }
 
-      final matchId = r.gedungId.isNotEmpty && activeGedungIds.contains(r.gedungId.trim());
-      final matchNama = r.gedungNama.isNotEmpty && activeGedungNames.contains(r.gedungNama.trim().toLowerCase());
-      return matchId || matchNama;
-    }).toList();
+    final totalFakultasCount = fakultasSet.length;
+    final totalProdiCount = prodiSet.length;
+    final totalMatkulCount = allMatkulList.length;
 
-    final totalGedungCount = effectiveGedungList.length;
-    final totalRuanganCount = effectiveRuanganList.length;
-    final totalFakultasCount = MockDatabase.fakultasData.length;
-    final totalProdiCount = MockDatabase.fakultasData.fold<int>(
-        0, (sum, f) => sum + ((f['jurusan'] as List?)?.length ?? 0));
-    final totalMatkulCount = MockDatabase.matkulData.length;
+    // Kumpulkan seluruh nama ruangan yang telah dialokasikan / terjadwal
+    final usedRoomNames = <String>{};
+    for (final j in jadwalList) {
+      if (j.ruanganNama.trim().isNotEmpty) usedRoomNames.add(j.ruanganNama.trim().toLowerCase());
+    }
+    for (final j in MockDatabase.jadwalFinal) {
+      if (j.ruanganNama.trim().isNotEmpty) usedRoomNames.add(j.ruanganNama.trim().toLowerCase());
+    }
+    for (final j in MockDatabase.jadwalGlobalMaster) {
+      if (j.ruanganNama.trim().isNotEmpty) usedRoomNames.add(j.ruanganNama.trim().toLowerCase());
+    }
+    for (final a in allAjuanList) {
+      if ((a.status == 'disetujui_admin' || a.status == 'banding_disetujui' || a.status == 'diverifikasi_kaprodi' || a.status == 'disetujui_dekan') &&
+          a.ruanganNama.trim().isNotEmpty) {
+        usedRoomNames.add(a.ruanganNama.trim().toLowerCase());
+      }
+    }
 
-    final usedRooms = MockDatabase.jadwalGlobalMaster
-        .map((j) => j.ruanganNama)
-        .where((r) => r.isNotEmpty)
-        .toSet()
-        .length;
-    final ruanganTerpakaiCount = totalRuanganCount == 0
-        ? 0
-        : (usedRooms <= totalRuanganCount ? usedRooms : totalRuanganCount);
+    int countTerpakai = 0;
+    for (final r in ruanganList) {
+      final rLower = r.nama.trim().toLowerCase();
+      if (usedRoomNames.any((u) => u == rLower || u.contains(rLower) || rLower.contains(u))) {
+        countTerpakai++;
+      }
+    }
+    if (countTerpakai == 0 && usedRoomNames.isNotEmpty) {
+      countTerpakai = usedRoomNames.length;
+    }
+    if (totalRuanganCount > 0 && countTerpakai > totalRuanganCount) {
+      countTerpakai = totalRuanganCount;
+    }
+
+    final ruanganTerpakaiCount = totalRuanganCount == 0 ? 0 : countTerpakai;
     final ruanganKosongCount = totalRuanganCount == 0
         ? 0
-        : (totalRuanganCount > ruanganTerpakaiCount
+        : (totalRuanganCount >= ruanganTerpakaiCount
             ? totalRuanganCount - ruanganTerpakaiCount
             : 0);
 

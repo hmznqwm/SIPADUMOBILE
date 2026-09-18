@@ -283,7 +283,7 @@ class _DosenMatrixTabState extends State<DosenMatrixTab> {
                   )
                 : ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 90),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
                     itemCount: daySlots.length,
                     separatorBuilder: (context, index) =>
                         const SizedBox(height: 8),
@@ -554,7 +554,7 @@ class _DosenMatrixTabState extends State<DosenMatrixTab> {
         // ── Bottom Action Bar (only visible when slots selected and submission window active) ──
         if (viewModel.selectedCount > 0 && viewModel.isSubmissionActive)
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 85),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),

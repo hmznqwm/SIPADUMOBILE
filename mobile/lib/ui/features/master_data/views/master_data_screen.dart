@@ -85,19 +85,67 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
     final api = context.read<ApiService>();
     setState(() => _isLoading = true);
     try {
-      await MockDatabase.initLocalCache(forceReload: true);
       final gedung = await api.getGedungList();
       final users = await api.getAllUsers();
+      final matkulList = await api.getAllMataKuliah();
       final dosen = users.where((u) => u.role == 'dosen' || u.role == 'kajur' || u.role == 'dekan').toList();
+
+      // Build Fakultas & Prodi list dynamically from API data
+      final Map<String, Set<String>> fakultasMap = {};
+      for (final u in users) {
+        final f = u.fakultasNama.trim();
+        final j = u.jurusanNama.trim();
+        if (f.isNotEmpty) {
+          fakultasMap.putIfAbsent(f, () => <String>{});
+          if (j.isNotEmpty) fakultasMap[f]!.add(j);
+        }
+      }
+      for (final m in matkulList) {
+        final f = m.fakultasNama.trim();
+        final j = m.jurusanNama.trim();
+        if (f.isNotEmpty) {
+          fakultasMap.putIfAbsent(f, () => <String>{});
+          if (j.isNotEmpty) fakultasMap[f]!.add(j);
+        }
+      }
+
+      final List<Map<String, dynamic>> dynamicFakultas = [];
+      int fIdx = 1;
+      fakultasMap.forEach((fNama, jSet) {
+        dynamicFakultas.add({
+          'id': 'FAK_$fIdx',
+          'nama': fNama,
+          'jurusan': jSet.toList(),
+        });
+        fIdx++;
+      });
+
+      final List<Map<String, dynamic>> dynamicMatkul = matkulList.map((m) {
+        final dObj = dosen.where((d) => d.id == m.dosenId).firstOrNull;
+        final resolvedDosenNama = (m.dosenNama != null && m.dosenNama!.isNotEmpty)
+            ? m.dosenNama!
+            : (dObj?.nama ?? (m.dosenId.isNotEmpty ? m.dosenId : '-'));
+        return {
+          'id': m.id,
+          'kode': m.id,
+          'nama': m.nama,
+          'sks': m.sks,
+          'fakultas': m.fakultasNama,
+          'jurusan': m.jurusanNama,
+          'dosenId': m.dosenId,
+          'dosen': resolvedDosenNama,
+          'kelas': m.kelasNama,
+        };
+      }).toList();
 
       if (mounted) {
         setState(() {
           _gedungList = List.from(gedung);
           _dosenList = List.from(dosen);
           _fakultasData.clear();
-          _fakultasData.addAll(MockDatabase.fakultasData);
+          _fakultasData.addAll(dynamicFakultas);
           _matkulData.clear();
-          _matkulData.addAll(MockDatabase.matkulData);
+          _matkulData.addAll(dynamicMatkul);
         });
       }
     } catch (e) {
@@ -246,6 +294,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
           MockDatabase.matkulData.add(m);
           MockDatabase.saveLocalMatkul();
           setState(() => _matkulData.add(m));
+          api.saveMataKuliah(m);
         },
       );
     } else if (_selectedCategory == 'Dosen Prioritas') {
@@ -263,6 +312,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
               _priorityDosenIds.add(newDosen.id);
             }
           });
+          _syncGlobalData();
         },
       );
     }
@@ -270,6 +320,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final api = context.read<ApiService>();
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: Color(0xFFF8FAFC),
@@ -697,6 +748,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
                         MockDatabase.matkulData.add(m);
                         MockDatabase.saveLocalMatkul();
                         setState(() => _matkulData.add(m));
+                        api.saveMataKuliah(m);
                       },
                     ),
                     addButtonText: 'Tambah Matkul',
@@ -717,6 +769,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
                           MockDatabase.matkulData.add(m);
                           MockDatabase.saveLocalMatkul();
                           setState(() => _matkulData.add(m));
+                          api.saveMataKuliah(m);
                         },
                       ),
                       addLabel: 'Tambah Matkul',
@@ -753,6 +806,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
                             if (dbIdx != -1) MockDatabase.matkulData[dbIdx] = updated;
                           });
                           MockDatabase.saveLocalMatkul();
+                          api.saveMataKuliah(updated);
                         },
                       ),
                       onDelete: (m) {
@@ -764,6 +818,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
                           category: 'Mata Kuliah',
                           onConfirm: () async {
                             await MockDatabase.cascadeDeleteMatkul(mKode, mNama);
+                            api.deleteMataKuliah(mKode);
                             setState(() {
                               _matkulData.removeWhere((item) => (item['kode']?.toString() ?? '') == mKode);
                               _selectedMatkulIds.remove(mKode);
@@ -801,7 +856,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
                   MasterDataSectionHeader(
                     title: 'Dosen & Prioritas MRV',
                     icon: Icons.people_outline_rounded,
-                    iconColor: const Color(0xFF0284C7),
+                    iconColor: AppColors.primary,
                     onAdd: () => showAddDosenDialog(
                       context: context,
                       dosenList: _dosenList,
@@ -816,6 +871,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
                             _priorityDosenIds.add(newDosen.id);
                           }
                         });
+                        _syncGlobalData();
                       },
                     ),
                     addButtonText: 'Tambah Dosen',
@@ -841,6 +897,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
                               _priorityDosenIds.add(newDosen.id);
                             }
                           });
+                          _syncGlobalData();
                         },
                       ),
                       addLabel: 'Tambah Dosen',
@@ -886,6 +943,7 @@ class _AdminMasterDataScreenState extends State<AdminMasterDataScreen> {
                               _priorityDosenIds.remove(updated.id);
                             }
                           });
+                          _syncGlobalData();
                         },
                       ),
                       onDelete: (d) {

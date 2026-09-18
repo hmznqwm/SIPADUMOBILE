@@ -6,7 +6,11 @@ from models.models import Notification
 import secrets
 import requests
 
-from core.config import SUPABASE_URL, SB_HEADERS
+from core.config import SUPABASE_URL, SUPABASE_KEY, SB_HEADERS
+from core.security import sanitize_supabase_param
+import logging
+
+logger = logging.getLogger("smartschedule.notifications")
 
 def sync_notification_to_supabase(n: Notification):
     try:
@@ -20,16 +24,17 @@ def sync_notification_to_supabase(n: Notification):
             "is_read": bool(n.is_read)
         }
         requests.post(url, headers=SB_HEADERS, json=payload, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to sync notification to Supabase: {e}")
 
 def delete_notifications_from_supabase(del_ids: List[str]):
     try:
         for nid in del_ids:
-            url = f"{SUPABASE_URL}/rest/v1/notifications?id=eq.{nid}"
+            safe_id = sanitize_supabase_param(nid)
+            url = f"{SUPABASE_URL}/rest/v1/notifications?id=eq.{safe_id}"
             requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to delete notification from Supabase: {e}")
 
 def update_read_in_supabase(ids: List[str], is_read: bool):
     try:
@@ -39,10 +44,11 @@ def update_read_in_supabase(ids: List[str], is_read: bool):
             "Content-Type": "application/json"
         }
         for nid in ids:
-            url = f"{SUPABASE_URL}/rest/v1/notifications?id=eq.{nid}"
+            safe_id = sanitize_supabase_param(nid)
+            url = f"{SUPABASE_URL}/rest/v1/notifications?id=eq.{safe_id}"
             requests.patch(url, headers=headers, json={"is_read": is_read}, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to update notification read in Supabase: {e}")
 
 def mark_all_read_in_supabase(uid: Optional[str]):
     try:
@@ -53,10 +59,11 @@ def mark_all_read_in_supabase(uid: Optional[str]):
         }
         url = f"{SUPABASE_URL}/rest/v1/notifications"
         if uid:
-            url += f"?user_id=eq.{uid}"
+            safe_uid = sanitize_supabase_param(uid)
+            url += f"?user_id=eq.{safe_uid}"
         requests.patch(url, headers=headers, json={"is_read": True}, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to mark all read in Supabase: {e}")
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 

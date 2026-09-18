@@ -36,6 +36,8 @@ class DosenAjuanTab extends StatefulWidget {
 }
 
 class _DosenAjuanTabState extends State<DosenAjuanTab> {
+  int _displayedCount = 10;
+
   @override
   Widget build(BuildContext context) {
     final api = context.read<ApiService>();
@@ -53,12 +55,17 @@ class _DosenAjuanTabState extends State<DosenAjuanTab> {
     }).toList();
 
     final isSelectionMode = widget.selectedAjuanIds.isNotEmpty;
+    final visibleAjuanList = dosenAjuanList.take(_displayedCount).toList();
+    final hasMore = dosenAjuanList.length > visibleAjuanList.length;
 
     return RefreshIndicator(
-      onRefresh: widget.onRefresh,
+      onRefresh: () async {
+        setState(() => _displayedCount = 10);
+        await widget.onRefresh();
+      },
       color: AppColors.primary,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
         children: [
           // ── Action Button: Ajukan Jam & Ruang Baru / Warning Locked ──
           if (!isSubmissionActive)
@@ -152,13 +159,35 @@ class _DosenAjuanTabState extends State<DosenAjuanTab> {
           const SizedBox(height: 14),
 
           // ── Section Header ──
-          Text(
-            'Daftar Ajuan Pengajaran Saya (${dosenAjuanList.length})',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Daftar Ajuan Pengajaran Saya (${dosenAjuanList.length})',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              if (dosenAjuanList.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: Text(
+                    'Tampil: ${visibleAjuanList.length}/${dosenAjuanList.length}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
+                ),
+            ],
           ),
 
           const SizedBox(height: 6),
@@ -200,8 +229,8 @@ class _DosenAjuanTabState extends State<DosenAjuanTab> {
                 ],
               ),
             )
-          else
-            ...dosenAjuanList.map((ajuan) {
+          else ...[
+            ...visibleAjuanList.map((ajuan) {
               final isSelected = widget.selectedAjuanIds.contains(ajuan.id);
               return DosenAjuanCard(
                 ajuan: ajuan,
@@ -213,6 +242,36 @@ class _DosenAjuanTabState extends State<DosenAjuanTab> {
                 onAjuanLongPress: widget.onAjuanLongPress,
               );
             }),
+            if (hasMore)
+              Padding(
+                padding: const EdgeInsets.only(top: 14, bottom: 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _displayedCount += 10;
+                      });
+                    },
+                    icon: const Icon(Icons.expand_more_rounded, size: 20),
+                    label: Text(
+                      'Muat 10 Ajuan Lagi (${dosenAjuanList.length - visibleAjuanList.length} Tersisa)',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.05),
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.2),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );

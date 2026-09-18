@@ -1,5 +1,5 @@
 // File: csp_confirmation_dialog.dart
-// Deskripsi: Modal konfirmasi modern, simpel, dan elegan sebelum eksekusi otomasi penjadwalan SCP.
+// Deskripsi: Modal konfirmasi modern, simpel, dan elegan sebelum eksekusi otomasi penjadwalan CSP.
 
 import 'package:flutter/material.dart';
 import '../../../../config/constants.dart';
@@ -45,7 +45,7 @@ class CspConfirmationDialog {
 
               // Title
               const Text(
-                'Jalankan Otomasi SCP?',
+                'Jalankan Otomasi CSP?',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16.5,

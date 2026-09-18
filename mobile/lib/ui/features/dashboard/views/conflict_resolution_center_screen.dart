@@ -77,10 +77,11 @@ class _ConflictResolutionCenterScreenState extends State<ConflictResolutionCente
         final allConflicts = allAjuan.where((a) {
           if (a.status.startsWith('ditolak')) return false;
           final conflictInfo = api.checkBuildingConflict(a);
+          if (conflictInfo['hasConflict'] == true) return true;
+          if (a.status == 'disetujui_admin' || a.status == 'banding_disetujui') return false;
           return a.status == 'bentrok_terdeteksi' ||
               a.status == 'menunggu_banding' ||
-              conflictInfo['hasConflict'] == true ||
-              (a.status != 'disetujui_admin' && a.status != 'banding_disetujui' && a.bentrokDetail != null && a.bentrokDetail!.isNotEmpty);
+              (a.bentrokDetail != null && a.bentrokDetail!.isNotEmpty);
         }).toList();
 
         // Counter per kategori

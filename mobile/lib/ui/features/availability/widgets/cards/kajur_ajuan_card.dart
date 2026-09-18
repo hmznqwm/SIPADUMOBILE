@@ -121,45 +121,52 @@ class KajurAjuanCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (selectedAjuanIds.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: Icon(
-                            isSelected
-                                ? Icons.check_circle_rounded
-                                : Icons.radio_button_unchecked_rounded,
-                            color: isSelected
-                                ? AppColors.primary
-                                : const Color(0xFF94A3B8),
-                            size: 18,
+                  Expanded(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (selectedAjuanIds.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Icon(
+                              isSelected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : const Color(0xFF94A3B8),
+                              size: 18,
+                            ),
+                          ),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Text(
+                              aj.jurusanNama.isNotEmpty
+                                  ? aj.jurusanNama
+                                  : aj.fakultasNama,
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF475569),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Text(
-                          aj.jurusanNama.isNotEmpty
-                              ? aj.jurusanNama
-                              : aj.fakultasNama,
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF475569),
-                          ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -179,6 +186,8 @@ class KajurAjuanCard extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         color: statusColor,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -231,26 +240,37 @@ class KajurAjuanCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Sem ${aj.semester}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                '${aj.hari}, ${aj.waktuFormatted} • Kelas ${aj.kelasNama} (${aj.jumlahMahasiswa} Mhs) • Sem ${aj.semester}',
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: Color(0xFF64748B),
-                ),
+              AjuanCardDetailGrid(
+                hari: aj.hari,
+                waktuFormatted: aj.waktuFormatted,
+                kelasNama: aj.kelasNama,
+                jumlahMahasiswa: aj.jumlahMahasiswa,
+                semester: aj.semester,
+                ruanganNama: aj.ruanganNama,
+                gedungNama: aj.gedungNama,
               ),
-              const SizedBox(height: 3),
-              Text(
-                'Ruang: ${aj.ruanganNama} • ${aj.gedungNama}',
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF2563EB),
-                ),
-              ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 4),
               const Divider(height: 1, color: Color(0xFFF1F5F9)),
               const SizedBox(height: 8),
 

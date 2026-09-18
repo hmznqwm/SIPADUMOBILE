@@ -9,6 +9,8 @@ class MataKuliahModel {
   final String jurusanId;
   final String jurusanNama;
   final String fakultasNama;
+  final String dosenId;
+  final String? dosenNama;
   final String semesterId;
   final String tipeSesi; // 'reguler' or 'split'
   final String? kebutuhanTipeRuangan;
@@ -22,6 +24,8 @@ class MataKuliahModel {
     required this.jurusanId,
     required this.jurusanNama,
     this.fakultasNama = 'Fakultas Sains dan Teknologi',
+    this.dosenId = 'DOS001',
+    this.dosenNama,
     required this.semesterId,
     this.tipeSesi = 'reguler',
     this.kebutuhanTipeRuangan,
@@ -47,6 +51,8 @@ class MataKuliahModel {
       jurusanId: json['jurusanId']?.toString() ?? json['jurusan_id']?.toString() ?? '',
       jurusanNama: json['jurusanNama']?.toString() ?? json['jurusan_nama']?.toString() ?? 'Teknik Informatika',
       fakultasNama: json['fakultasNama']?.toString() ?? json['fakultas_nama']?.toString() ?? 'Fakultas Sains & Teknologi',
+      dosenId: json['dosenId']?.toString() ?? json['dosen_id']?.toString() ?? 'DOS001',
+      dosenNama: json['dosenNama']?.toString() ?? json['dosen_nama']?.toString() ?? json['dosen']?.toString(),
       semesterId: json['semesterId']?.toString() ?? json['semester_id']?.toString() ?? 'SEM001',
       tipeSesi: json['tipeSesi']?.toString() ?? json['tipe_sesi']?.toString() ?? 'reguler',
       kebutuhanTipeRuangan: json['kebutuhanTipeRuangan']?.toString() ?? json['kebutuhan_tipe_ruangan']?.toString(),
@@ -63,6 +69,10 @@ class MataKuliahModel {
       'jurusanId': jurusanId,
       'jurusanNama': jurusanNama,
       'fakultasNama': fakultasNama,
+      'dosenId': dosenId,
+      'dosenNama': dosenNama,
+      'dosen_nama': dosenNama,
+      'dosen': dosenNama,
       'semesterId': semesterId,
       'tipeSesi': tipeSesi,
       'kebutuhanTipeRuangan': kebutuhanTipeRuangan,

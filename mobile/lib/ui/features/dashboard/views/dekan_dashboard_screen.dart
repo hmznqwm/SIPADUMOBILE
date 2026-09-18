@@ -8,7 +8,9 @@ import 'package:provider/provider.dart';
 import '../../../../config/constants.dart';
 import '../../../../data/mock/mock_database.dart';
 import '../../../../data/models/ajuan_pengajaran_model.dart';
+import '../../../../data/models/mata_kuliah_model.dart';
 import '../../../../data/services/api_service.dart';
+import '../../auth/view_models/auth_view_model.dart';
 import '../widgets/csp_confirmation_dialog.dart';
 
 class DekanDashboardView extends StatefulWidget {
@@ -29,7 +31,7 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
   int _totalGedung = 0;
   bool _isLoading = true;
   bool _isEngineRunning = false;
-  final String _fakultasNama = 'Fakultas Sains & Teknologi';
+  String _fakultasNama = 'Fakultas Sains & Teknologi';
 
   @override
   void initState() {
@@ -37,22 +39,33 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
     _loadDekanData();
   }
 
+  bool _matchFakultas(String? a, String? b) {
+    final na = (a ?? '').toLowerCase().replaceAll('&', 'dan').replaceAll(RegExp(r'\s+'), ' ').trim();
+    final nb = (b ?? '').toLowerCase().replaceAll('&', 'dan').replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (na.isEmpty || nb.isEmpty) return false;
+    return na.contains(nb) || nb.contains(na);
+  }
+
   Future<void> _loadDekanData() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      await MockDatabase.initLocalCache(forceReload: true);
+      final user = context.read<AuthViewModel>().currentUser;
+      if (user != null && user.fakultasNama.isNotEmpty && user.fakultasNama != 'Universitas') {
+        _fakultasNama = user.fakultasNama;
+      }
 
       final api = context.read<ApiService>();
+      await MockDatabase.initLocalCache(forceReload: true);
+
       final allAjuan = await api.getAjuanPengajaranList();
-      final fstAjuan = allAjuan.where((a) => a.fakultasNama == _fakultasNama).toList();
+      final fstAjuan = allAjuan.where((a) => _matchFakultas(a.fakultasNama, _fakultasNama)).toList();
 
       // ── Dosen: baca dari master data user (bukan dari ajuan) ──
       final allUsers = await api.getAllUsers();
       final fstDosen = allUsers.where((u) {
         if (u.role != 'dosen' && u.role != 'kajur') return false;
-        return u.fakultasNama.toLowerCase().contains(_fakultasNama.toLowerCase()) ||
-               _fakultasNama.toLowerCase().contains(u.fakultasNama.toLowerCase());
+        return _matchFakultas(u.fakultasNama, _fakultasNama);
       }).toList();
 
       // ── Ruangan & Gedung: baca dari master data ──
@@ -61,19 +74,29 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
       final allGedung = await api.getGedungList();
       final effectiveGedung = allGedung.isNotEmpty ? allGedung : MockDatabase.gedungList;
 
-      // ── Matkul: baca dari matkulData master (bukan dari ajuan) ──
-      final fstMatkul = MockDatabase.matkulData.where((m) {
-        final fak = (m['fakultas'] ?? '').toString().toLowerCase();
-        return fak.contains(_fakultasNama.toLowerCase()) ||
-               _fakultasNama.toLowerCase().contains(fak);
-      }).toList();
+      // ── Matkul: baca dari live getAllMataKuliah() Supabase/Backend ──
+      final allMatkul = await api.getAllMataKuliah();
+      final effectiveMatkul = allMatkul.isNotEmpty
+          ? allMatkul
+          : MockDatabase.matkulData.map((m) => MataKuliahModel.fromJson(m)).toList();
+      final fstMatkul = effectiveMatkul.where((m) => _matchFakultas(m.fakultasNama, _fakultasNama)).toList();
 
-      // ── Jurusan: hitung dari jurusan unik di matkul fakultas ini ──
+      // ── Jurusan: hitung dari jurusan unik di matkul & dosen fakultas ini ──
       final Set<String> jurusanSet = {};
       for (final m in fstMatkul) {
-        final jur = (m['jurusan'] ?? '').toString().trim();
-        if (jur.isNotEmpty) jurusanSet.add(jur);
+        final jur = m.jurusanNama.trim();
+        if (jur.isNotEmpty && jur != 'Semua' && jur != 'GLOBAL') jurusanSet.add(jur);
       }
+      for (final d in fstDosen) {
+        final jur = d.jurusanNama.trim();
+        if (jur.isNotEmpty && jur != 'Semua' && jur != 'GLOBAL') {
+          for (final part in jur.split(',')) {
+            final clean = part.trim();
+            if (clean.isNotEmpty && clean != 'Semua' && clean != 'GLOBAL') jurusanSet.add(clean);
+          }
+        }
+      }
+      if (jurusanSet.isEmpty) jurusanSet.add('Teknik Informatika');
 
       if (mounted) {
         setState(() {
@@ -94,12 +117,142 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
     }
   }
 
+  bool get _isFacultyAllApprovedAndConflictFree {
+    if (_facultyAjuanList.isEmpty) return true;
+    final unapprovedOrPending = _facultyAjuanList.where((a) =>
+        a.status != 'disetujui_admin' &&
+        a.status != 'disetujui' &&
+        a.status != 'banding_disetujui');
+    final bentrok = _facultyAjuanList.where((a) =>
+        a.status == 'bentrok_terdeteksi' ||
+        (a.bentrokDetail != null && a.bentrokDetail!.trim().isNotEmpty));
+    return unapprovedOrPending.isEmpty && bentrok.isEmpty;
+  }
+
   Future<void> _runFacultyCSPEngine() async {
+    if (_isFacultyAllApprovedAndConflictFree) {
+      final forceRun = await showModalBottomSheet<bool>(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.primary,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Jadwal Fakultas Rapi & Optimal',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$_fakultasNama (0 Bentrok)',
+                          style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Text(
+                  'Seluruh pengajuan dosen di lingkungan $_fakultasNama telah disetujui dan 0 bentrok terdeteksi. Tidak ada jadwal yang perlu dirapikan oleh Engine CSP.',
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), height: 1.45),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text(
+                        'Tutup',
+                        style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text(
+                        'Tetap Re-Generate',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (forceRun != true || !mounted) return;
+    }
+
     final confirm = await CspConfirmationDialog.show(
       context,
       scopeTitle: _fakultasNama,
       scopeDescription:
-          'Engine SCP fakultas akan menyelaraskan dan mengoptimasi jadwal perkuliahan seluruh program studi di lingkungan $_fakultasNama.',
+          'Engine CSP fakultas akan menyelaraskan dan mengoptimasi jadwal perkuliahan seluruh program studi di lingkungan $_fakultasNama.',
       roleLabel: 'Dekan Fakultas',
     );
     if (confirm != true || !mounted) return;
@@ -398,9 +551,9 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
                 ],
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Fakultas Sains & Teknologi',
-                style: TextStyle(
+              Text(
+                _fakultasNama,
+                style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,

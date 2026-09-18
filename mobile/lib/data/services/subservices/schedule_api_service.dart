@@ -92,15 +92,15 @@ class ScheduleApiService {
 
     JadwalModel syncJadwal(JadwalModel j) {
       final gId = (j.gedungId ?? '').trim().toLowerCase();
-      final gNama = (j.gedungNama ?? '').trim().toLowerCase();
+      final gNama = j.gedungNama.trim().toLowerCase();
       final resolvedGedung = activeGedungMap[gId] ?? activeGedungNameMap[gNama]?.nama ?? j.gedungNama;
 
       final rId = (j.ruanganId ?? '').trim().toLowerCase();
-      final rNama = (j.ruanganNama ?? '').trim().toLowerCase();
+      final rNama = j.ruanganNama.trim().toLowerCase();
       final resolvedRuangan = activeRuanganMap[rId]?.nama ?? activeRuanganNameMap[rNama]?.nama ?? j.ruanganNama;
 
-      final mId = (j.mataKuliahId ?? '').trim().toLowerCase();
-      final mNama = (j.mataKuliahNama ?? '').trim().toLowerCase();
+      final mId = j.mataKuliahId.trim().toLowerCase();
+      final mNama = j.mataKuliahNama.trim().toLowerCase();
       final resolvedMatkul = activeMatkulMap[mId] ?? activeMatkulNameMap[mNama]?['nama'] ?? j.mataKuliahNama;
 
       final uId = (j.dosenId ?? '').trim().toLowerCase();

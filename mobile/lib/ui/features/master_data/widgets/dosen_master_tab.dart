@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 
-import '../../../../config/constants.dart';
 import '../../../../data/models/user_model.dart';
 import 'master_data_dialogs.dart';
 
@@ -102,12 +101,12 @@ class DosenMasterList extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
+              color: isSelected ? const Color(0xFF059669).withValues(alpha: 0.08) : Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: isSelected
-                    ? AppColors.primary
-                    : (isPriority ? AppColors.primary.withValues(alpha: 0.4) : const Color(0xFFE2E8F0)),
+                    ? const Color(0xFF059669)
+                    : (isPriority ? const Color(0xFF059669).withValues(alpha: 0.5) : const Color(0xFFE2E8F0)),
                 width: isSelected ? 1.5 : 1.0,
               ),
             ),
@@ -117,8 +116,8 @@ class DosenMasterList extends StatelessWidget {
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: isSelected
-                      ? AppColors.primary
-                      : (isPriority ? AppColors.primary.withValues(alpha: 0.15) : const Color(0xFFF1F5F9)),
+                      ? const Color(0xFF059669)
+                      : (isPriority ? const Color(0xFF059669).withValues(alpha: 0.15) : const Color(0xFFF1F5F9)),
                   child: Icon(
                     isSelected
                         ? Icons.check
@@ -126,7 +125,7 @@ class DosenMasterList extends StatelessWidget {
                     size: 18,
                     color: isSelected
                         ? Colors.white
-                        : (isPriority ? AppColors.primary : const Color(0xFF64748B)),
+                        : (isPriority ? const Color(0xFF059669) : const Color(0xFF64748B)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -142,7 +141,7 @@ class DosenMasterList extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.bold,
-                                color: isSelected ? AppColors.primary : const Color(0xFF0F172A),
+                                color: isSelected ? const Color(0xFF059669) : const Color(0xFF0F172A),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -151,15 +150,15 @@ class DosenMasterList extends StatelessWidget {
                           if (isPriority) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFECFDF5),
                                 borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                                border: Border.all(color: const Color(0xFFA7F3D0)),
                               ),
                               child: const Text(
                                 'Prioritas MRV',
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
                               ),
                             ),
                           ],
@@ -176,7 +175,7 @@ class DosenMasterList extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           'Matkul: $matkulStr',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF059669)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -186,7 +185,8 @@ class DosenMasterList extends StatelessWidget {
                 ),
                 Switch(
                   value: isPriority,
-                  activeThumbColor: AppColors.primary,
+                  activeThumbColor: const Color(0xFF059669),
+                  activeTrackColor: const Color(0xFFA7F3D0),
                   onChanged: (_) => onTogglePriority(d.id, isPriority),
                 ),
               ],

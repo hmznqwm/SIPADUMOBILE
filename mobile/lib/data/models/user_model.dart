@@ -61,11 +61,10 @@ class UserModel {
     final String email = json['email']?.toString().trim() ?? '';
     final String id = json['id']?.toString().trim() ?? '';
     String role = json['role']?.toString().toLowerCase().trim() ?? '';
-
-    if (email.toLowerCase() == 'hamizanqowiem90@gmail.com' || id.toUpperCase() == 'ADM001') {
-      role = 'admin';
-    } else if (role.isEmpty) {
-      if (id.toUpperCase().startsWith('DKN')) {
+    if (role.isEmpty) {
+      if (id.toUpperCase().startsWith('ADM')) {
+        role = 'admin';
+      } else if (id.toUpperCase().startsWith('DKN')) {
         role = 'dekan';
       } else if (id.toUpperCase().startsWith('KJR')) {
         role = 'kajur';
@@ -74,9 +73,12 @@ class UserModel {
       }
     }
 
+    final String rawId = json['id']?.toString().trim() ?? '';
+    final String resolvedId = rawId.isNotEmpty ? rawId : (id.isNotEmpty ? id : 'DSN001');
+
     return UserModel(
-      id: id.isNotEmpty ? id : (role == 'admin' ? 'ADM001' : 'DSN001'),
-      nama: role == 'admin' ? 'Super Admin' : (json['nama']?.toString() ?? 'Pengguna'),
+      id: resolvedId,
+      nama: json['nama']?.toString() ?? (role == 'admin' ? 'Administrator' : 'Pengguna'),
       email: email,
       role: role,
       jurusanId: json['jurusanId']?.toString() ?? json['jurusan_id']?.toString() ?? (role == 'admin' ? 'GLOBAL' : 'JUR001'),

@@ -1430,29 +1430,54 @@
         <div class="slide-header">
             <h2>Panduan Tanya-Jawab Teknis Algoritma (FAQ Presentasi)</h2>
         </div>
-        <div class="slide-body" style="gap: 10px;">
-            <div class="role-card" style="padding: 12px 16px; border-left: 4px solid #3b82f6;">
-                <div class="role-title" style="font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">
+        <div class="slide-body" style="gap: 8px; overflow-y: auto; max-height: 540px; padding-right: 6px;">
+            <!-- FAQ 1 -->
+            <div class="role-card" style="padding: 10px 14px; border-left: 4px solid #3b82f6; margin-bottom: 0;">
+                <div class="role-title" style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 3px;">
                     ❓ Q1: Bagaimana jika ada jadwal yang sudah disetujui Admin? Apakah CSP akan mengubah/merusak jadwal tersebut?
                 </div>
-                <p style="margin: 0; font-size: 12.5px; color: #475569; line-height: 1.45;">
-                    <strong>Jawaban: TIDAK AKAN DIUBAH / DIRUSAK.</strong> Jadwal yang disetujui Admin diperlakukan sebagai <em>Hard Constraint (Pre-assigned Assignment)</em> yang terkunci. Saat CSP running ulang, slot jam &amp; ruangan jadwal sah langsung ditandai <code>conflict = True</code> sehingga ajuan baru diselipkan di sela-sela slot kosong tanpa menggeser jadwal lama.
+                <p style="margin: 0; font-size: 11.5px; color: #475569; line-height: 1.45;">
+                    <strong>Jawaban: TIDAK AKAN DIUBAH / DIRUSAK (Immutable Locked).</strong> Jadwal yang berstatus <code>disetujui_admin</code> dimuat sebagai <em>Hard Constraint</em> yang terkunci sebelum eksekusi dimulai. Domain slot waktu dan ruangan jadwal sah otomatis dipangkas (<em>Domain Pruning</em>), sehingga ajuan baru hanya ditempatkan di celah waktu/ruangan kosong yang tersisa tanpa pernah menggeser jadwal lama.
                 </p>
             </div>
-            <div class="role-card" style="padding: 12px 16px; border-left: 4px solid #10b981;">
-                <div class="role-title" style="font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">
+
+            <!-- FAQ 2 -->
+            <div class="role-card" style="padding: 10px 14px; border-left: 4px solid #10b981; margin-bottom: 0;">
+                <div class="role-title" style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 3px;">
                     ❓ Q2: Bagaimana cara kerja CSP jika ada ruangan kosong milik Fakultas Lain?
                 </div>
-                <p style="margin: 0; font-size: 12.5px; color: #475569; line-height: 1.45;">
-                    <strong>Jawaban: Melalui Domain Filtering (<code>akses_jurusan</code>).</strong> Jika gedung bersifat eksklusif fakultas tertentu, CSP akan memfilter/memblokir ruangan tersebut walau kosong. Namun jika gedung terdaftar sebagai <em>Shared Resource (Gedung Kuliah Bersama)</em>, CSP diperbolehkan meminjam ruangan kosong tersebut secara otomatis tanpa bentrok.
+                <p style="margin: 0; font-size: 11.5px; color: #475569; line-height: 1.45;">
+                    <strong>Jawaban: Melalui Prioritas Homebase &amp; Jeda Transit (15 Menit).</strong> CSP selalu memprioritaskan gedung fakultas asal. Jika penuh dan ruangan fakultas lain berstatus <em>Sharing / Ready</em> dengan kapasitas memadai, CSP dapat menggunakannya dengan <strong>syarat wajib jeda transit minimal 15 menit</strong> untuk mobilitas perpindahan gedung antar-fakultas.
                 </p>
             </div>
-            <div class="role-card" style="padding: 12px 16px; border-left: 4px solid #8b5cf6;">
-                <div class="role-title" style="font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">
-                    ❓ Q3: Bagaimana penanganan bentrok mendadak saat perkuliahan berjalan?
+
+            <!-- FAQ 3 -->
+            <div class="role-card" style="padding: 10px 14px; border-left: 4px solid #f59e0b; margin-bottom: 0;">
+                <div class="role-title" style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 3px;">
+                    ❓ Q3: Bagaimana cara kerja CSP ketika Dosen mengajar di 2 Fakultas/Prodi atau lebih?
                 </div>
-                <p style="margin: 0; font-size: 12.5px; color: #475569; line-height: 1.45;">
-                    <strong>Jawaban: Fitur RCK (Pencari Ruang Cadangan).</strong> Pengguna tinggal menekan tombol RCK di aplikasi Flutter untuk memindai Master Data secara real-time dan mendapatkan rekomendasi ruangan pengganti dengan skor kesesuaian tertinggi.
+                <p style="margin: 0; font-size: 11.5px; color: #475569; line-height: 1.45;">
+                    <strong>Jawaban: Single Global Lecturer Entity (Bebas Tabrakan Global).</strong> Variabel Dosen diikat oleh <code>dosen_id</code> unik secara global. CSP menerapkan <em>Global Hard Constraint</em>: melarang dosen berada di 2 sesi bersamaan dan otomatis menghitung <em>Travel Buffer</em> jika dosen harus berpindah antar-gedung/fakultas yang berbeda di hari yang sama.
+                </p>
+            </div>
+
+            <!-- FAQ 4 -->
+            <div class="role-card" style="padding: 10px 14px; border-left: 4px solid #8b5cf6; margin-bottom: 0;">
+                <div class="role-title" style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 3px;">
+                    ❓ Q4: Bagaimana jika Dosen mengajar lebih dari 3 kelas berbeda di hari dan gedung yang sama?
+                </div>
+                <p style="margin: 0; font-size: 11.5px; color: #475569; line-height: 1.45;">
+                    <strong>Jawaban: Sequential Time-Slot Packing &amp; Jam Operasional Gedung.</strong> Karena berada di satu gedung (jarak transit = 0 menit), CSP menyusun kelas secara berurutan (*compact*) untuk meminimalisir jam kosong yang melelahkan, serta memastikan seluruh kegiatan selesai sebelum batas jam tutup operasional gedung (maks. 18.30 WIB).
+                </p>
+            </div>
+
+            <!-- FAQ 5 -->
+            <div class="role-card" style="padding: 10px 14px; border-left: 4px solid #ec4899; margin-bottom: 0;">
+                <div class="role-title" style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 3px;">
+                    ❓ Q5: Dosen mengeluh "Mengajar 3 kelas di 1 hari selalu pindah-pindah kelas alias mutar-mutar padahal 1 gedung" — Bagaimana solusinya di CSP?
+                </div>
+                <p style="margin: 0; font-size: 11.5px; color: #475569; line-height: 1.45;">
+                    <strong>Jawaban: Optimasi Ruang Berkelanjutan (<em>Anchor Room &amp; Locality Heuristic</em>).</strong> Saat Dosen dialokasikan di Ruangan X pada sesi 1, CSP otomatis memberikan skor bobot prioritas tertinggi pada <strong>Ruangan X yang sama (Stay in Room)</strong> untuk sesi 2 dan 3 berikutnya. Dosen tetap berada di ruangan yang sama, dan rombel mahasiswa kelas berikutnya yang datang ke ruangan tersebut.
                 </p>
             </div>
         </div>

@@ -33,14 +33,19 @@ void main() {
   // Memastikan binding Flutter sudah siap sebelum menjalankan aplikasi
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Mengatur transparansi dan warna sistem navigation bar Android agar tidak menutupi tombol navbar
+  // Aktifkan mode Edge-to-Edge secara eksplisit agar area bilah navigasi HP dapat diatur padding-nya dengan presisi
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+  // Mengatur transparansi dan warna sistem status bar & navigation bar Android
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
       systemNavigationBarColor: Colors.white,
-      systemNavigationBarIconBrightness: Brightness.dark,
       systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarContrastEnforced: false,
     ),
   );
 

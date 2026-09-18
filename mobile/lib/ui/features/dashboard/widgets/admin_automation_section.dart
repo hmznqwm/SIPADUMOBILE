@@ -1,5 +1,5 @@
 // File: admin_automation_section.dart
-// Deskripsi: Widget panel otomasi jadwal (Tombol Engine SCP dan Switch Window Ketersediaan).
+// Deskripsi: Widget panel otomasi jadwal (Tombol Engine CSP dan Switch Window Ketersediaan).
 
 import 'package:flutter/material.dart';
 
@@ -8,6 +8,7 @@ import '../../../../config/constants.dart';
 class AdminAutomationSection extends StatelessWidget {
   final bool isSubmissionActive;
   final bool isEngineRunning;
+  final bool isAllApprovedAndConflictFree;
   final VoidCallback onRunCSPEngine;
   final ValueChanged<bool> onToggleSubmissionStatus;
 
@@ -15,6 +16,7 @@ class AdminAutomationSection extends StatelessWidget {
     super.key,
     required this.isSubmissionActive,
     required this.isEngineRunning,
+    this.isAllApprovedAndConflictFree = false,
     required this.onRunCSPEngine,
     required this.onToggleSubmissionStatus,
   });
@@ -34,14 +36,20 @@ class AdminAutomationSection extends StatelessWidget {
         ),
         const SizedBox(height: 8),
 
-        // ── Engine SCP Action Bar ──
+        // ── Engine CSP Action Bar ──
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isAllApprovedAndConflictFree
+                ? AppColors.surfaceVariant
+                : Colors.white,
             borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(
+              color: isAllApprovedAndConflictFree
+                  ? AppColors.primary.withValues(alpha: 0.3)
+                  : const Color(0xFFE2E8F0),
+            ),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x04000000),
@@ -50,60 +58,106 @@ class AdminAutomationSection extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.teal.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.tune_rounded, color: Colors.teal[700], size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SCP',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.teal[800],
-                      ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const Text(
-                      'Generate jadwal otomatis',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
+                    child: Icon(
+                      isAllApprovedAndConflictFree
+                          ? Icons.task_alt_rounded
+                          : Icons.tune_rounded,
+                      color: AppColors.primary,
+                      size: 20,
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
-                ),
-                onPressed: isEngineRunning ? null : onRunCSPEngine,
-                child: isEngineRunning
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: Colors.white,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Engine CSP',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      )
-                    : const Text('Jalankan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 2),
+                        Text(
+                          isAllApprovedAndConflictFree
+                              ? 'Jadwal Rapi & Optimal'
+                              : 'Generate jadwal otomatis',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    onPressed: isEngineRunning ? null : onRunCSPEngine,
+                    child: isEngineRunning
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            isAllApprovedAndConflictFree ? 'Jadwal Rapi' : 'Jalankan',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                ],
               ),
+              if (isAllApprovedAndConflictFree) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 14),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Tidak ada jadwal yang perlu dirapikan (Semua pengajuan disetujui & 0 bentrok).',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -129,14 +183,12 @@ class AdminAutomationSection extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isSubmissionActive
-                      ? Colors.teal.withValues(alpha: 0.1)
-                      : AppColors.primary.withValues(alpha: 0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   isSubmissionActive ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
-                  color: isSubmissionActive ? Colors.teal[700] : AppColors.primary,
+                  color: AppColors.primary,
                   size: 20,
                 ),
               ),
@@ -147,10 +199,10 @@ class AdminAutomationSection extends StatelessWidget {
                   children: [
                     Text(
                       isSubmissionActive ? 'Window Ketersediaan: Buka' : 'Window Ketersediaan: Kunci',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: isSubmissionActive ? Colors.teal[800] : AppColors.primary,
+                        color: AppColors.primary,
                       ),
                     ),
                     Text(
@@ -164,7 +216,8 @@ class AdminAutomationSection extends StatelessWidget {
               ),
               Switch(
                 value: isSubmissionActive,
-                activeThumbColor: Colors.teal[700],
+                activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
+                activeThumbColor: AppColors.primary,
                 onChanged: onToggleSubmissionStatus,
               ),
             ],

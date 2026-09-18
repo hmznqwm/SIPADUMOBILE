@@ -9,7 +9,11 @@ from models.models import (
 import secrets
 import requests
 
-from core.config import SUPABASE_URL, SB_HEADERS
+from core.config import SUPABASE_URL, SUPABASE_KEY, SB_HEADERS
+from core.security import sanitize_supabase_param
+import logging
+
+logger = logging.getLogger("smartschedule.engine")
 
 def sync_generated_to_supabase(scope: str, fakultas_nama: str, jurusan_nama: str, schedules: list, ajuan_updates: list, force_replan: bool = False):
     try:
@@ -20,10 +24,10 @@ def sync_generated_to_supabase(scope: str, fakultas_nama: str, jurusan_nama: str
             if scope == "global":
                 requests.delete(f"{del_url}?id=not.is.null", headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
             elif scope == "fakultas" and fakultas_nama:
-                clean_f = fakultas_nama.replace("&", "dan").strip()
+                clean_f = sanitize_supabase_param(fakultas_nama.replace("&", "dan").strip())
                 requests.delete(f"{del_url}?fakultas_nama=ilike.%25{clean_f}%25", headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
             elif scope == "jurusan" and jurusan_nama:
-                clean_j = jurusan_nama.strip()
+                clean_j = sanitize_supabase_param(jurusan_nama.strip())
                 requests.delete(f"{del_url}?jurusan_nama=ilike.%25{clean_j}%25", headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
 
         # 2. Insert or update new schedules in batch

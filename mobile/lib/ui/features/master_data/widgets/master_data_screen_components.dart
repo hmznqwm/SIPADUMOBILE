@@ -106,6 +106,7 @@ class MasterDataSectionHeader extends StatelessWidget {
   final VoidCallback onAdd;
   final String addButtonText;
   final bool showAddButton;
+  final Color? buttonColor;
 
   const MasterDataSectionHeader({
     super.key,
@@ -115,10 +116,12 @@ class MasterDataSectionHeader extends StatelessWidget {
     required this.onAdd,
     required this.addButtonText,
     this.showAddButton = true,
+    this.buttonColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final activeBtnColor = buttonColor ?? iconColor;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -151,7 +154,7 @@ class MasterDataSectionHeader extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: activeBtnColor,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(

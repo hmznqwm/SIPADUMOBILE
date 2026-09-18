@@ -113,14 +113,16 @@ class ScheduleBatchResolveDialog {
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
-                            child: const Row(
+                            child: Row(
                               children: [
-                                Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF475569)),
-                                SizedBox(width: 8),
+                                const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF475569)),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'Periksa rekomendasi jadwal sebelum diterapkan.',
-                                    style: TextStyle(fontSize: 11, color: Color(0xFF334155), height: 1.3),
+                                    conflicts.length > 25
+                                        ? 'Menampilkan 25 dari ${conflicts.length} konflik. Menekan "Terapkan Semua Solusi" akan menyesuaikan seluruh ${conflicts.length} konflik secara otomatis.'
+                                        : 'Periksa rekomendasi jadwal sebelum diterapkan.',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF334155), height: 1.3),
                                   ),
                                 ),
                               ],
@@ -128,7 +130,7 @@ class ScheduleBatchResolveDialog {
                           ),
                           const SizedBox(height: 12),
 
-                          ...conflicts.map((aj) {
+                          ...conflicts.take(25).map((aj) {
                             final suggestion = api.findSmartAlternativeSlot(aj);
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),

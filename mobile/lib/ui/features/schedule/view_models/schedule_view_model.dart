@@ -75,16 +75,7 @@ class ScheduleViewModel extends ChangeNotifier {
     final user = _authRepository.currentUser;
 
     bool isRelationalValid(JadwalModel j) {
-      return MockDatabase.isRelationalValidItem(
-        gedungId: j.gedungId,
-        gedungNama: j.gedungNama,
-        ruanganId: j.ruanganId,
-        ruanganNama: j.ruanganNama,
-        matkulId: j.mataKuliahId,
-        matkulNama: j.mataKuliahNama,
-        dosenId: j.dosenId,
-        dosenNama: j.dosenNama,
-      );
+      return j.mataKuliahNama.trim().isNotEmpty && j.hari.trim().isNotEmpty;
     }
 
     return _jadwalList.where((j) {
@@ -94,8 +85,9 @@ class ScheduleViewModel extends ChangeNotifier {
 
       // Role KaProdi / KaJur: terikat ke program studi sendiri
       if (user?.role == 'kajur') {
-        final userProdi = (user != null && user.jurusanNama.isNotEmpty) ? user.jurusanNama : 'Teknik Informatika';
-        final matchProdi = j.jurusanNama == userProdi;
+        final userProdi = (user != null && user.jurusanNama.isNotEmpty) ? user.jurusanNama.toLowerCase() : 'teknik informatika';
+        final jur = (j.jurusanNama ?? '').toLowerCase();
+        final matchProdi = jur.contains(userProdi) || userProdi.contains(jur);
         return matchDay && matchProdi;
       }
 
@@ -129,15 +121,25 @@ class ScheduleViewModel extends ChangeNotifier {
         _jadwalList = await _jadwalRepository.getGlobalJadwal();
       } else if (user.role == 'dekan') {
         final all = await _jadwalRepository.getGlobalJadwal();
-        final fak = user.fakultasNama.isNotEmpty ? user.fakultasNama : 'Fakultas Sains & Teknologi';
-        _jadwalList = all.where((j) => j.fakultasNama == null || j.fakultasNama == fak || (fak.contains('Ekonomi') && (j.fakultasNama?.contains('Ekonomi') ?? false))).toList();
+        final fak = (user.fakultasNama.isNotEmpty ? user.fakultasNama : 'Fakultas Sains & Teknologi').toLowerCase();
+        _jadwalList = all.where((j) => (j.fakultasNama ?? '').toLowerCase().contains(fak) || fak.contains((j.fakultasNama ?? '').toLowerCase())).toList();
       } else if (user.role == 'kajur') {
         final all = await _jadwalRepository.getGlobalJadwal();
-        final jur = user.jurusanNama.isNotEmpty ? user.jurusanNama : 'Teknik Informatika';
-        _jadwalList = all.where((j) => j.jurusanNama == jur).toList();
-        _selectedProdi = jur;
+        final jur = (user.jurusanNama.isNotEmpty ? user.jurusanNama : 'Teknik Informatika').toLowerCase();
+        _jadwalList = all.where((j) => (j.jurusanNama ?? '').toLowerCase().contains(jur) || jur.contains((j.jurusanNama ?? '').toLowerCase())).toList();
+        _selectedProdi = user.jurusanNama.isNotEmpty ? user.jurusanNama : 'Teknik Informatika';
       } else {
-        _jadwalList = await _jadwalRepository.getJadwalFinal(user.id);
+        final byId = await _jadwalRepository.getJadwalFinal(user.id);
+        if (byId.isNotEmpty) {
+          _jadwalList = byId;
+        } else {
+          final all = await _jadwalRepository.getGlobalJadwal();
+          _jadwalList = all.where((j) =>
+            (j.dosenId != null && j.dosenId == user.id) ||
+            (j.dosenNama != null && user.nama.isNotEmpty && j.dosenNama!.toLowerCase().contains(user.nama.toLowerCase())) ||
+            (j.dosenNama != null && user.nama.isNotEmpty && user.nama.toLowerCase().contains(j.dosenNama!.toLowerCase()))
+          ).toList();
+        }
       }
     } catch (e) {
       _errorMessage = e.toString();

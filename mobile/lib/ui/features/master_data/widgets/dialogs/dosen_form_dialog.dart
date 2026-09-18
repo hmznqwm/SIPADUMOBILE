@@ -60,10 +60,10 @@ void showAddDosenDialog({
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.person_add_alt_1_rounded, color: AppColors.primary, size: 20),
+                      child: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF059669), size: 20),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -183,7 +183,8 @@ void showAddDosenDialog({
                       ),
                       Switch(
                         value: isPriority,
-                        activeThumbColor: AppColors.primary,
+                        activeThumbColor: const Color(0xFF059669),
+                        activeTrackColor: const Color(0xFFA7F3D0),
                         onChanged: (v) => setModalState(() => isPriority = v),
                       ),
                     ],
@@ -208,7 +209,7 @@ void showAddDosenDialog({
                       flex: 2,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: const Color(0xFF059669),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           elevation: 0,
@@ -314,10 +315,10 @@ void showEditDosenDialog({
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: const Color(0xFFECFDF5),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 20),
+                      child: const Icon(Icons.edit_note_rounded, color: Color(0xFF059669), size: 20),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -437,7 +438,8 @@ void showEditDosenDialog({
                       ),
                       Switch(
                         value: isPriority,
-                        activeThumbColor: AppColors.primary,
+                        activeThumbColor: const Color(0xFF059669),
+                        activeTrackColor: const Color(0xFFA7F3D0),
                         onChanged: (v) => setModalState(() => isPriority = v),
                       ),
                     ],
@@ -462,7 +464,7 @@ void showEditDosenDialog({
                       flex: 2,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: const Color(0xFF059669),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           elevation: 0,

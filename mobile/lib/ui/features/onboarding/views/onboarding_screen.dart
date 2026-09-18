@@ -138,7 +138,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
             // ── Bottom Section: Indicator, CTA Button & Sign In Link ──
             Padding(
-              padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
+              padding: EdgeInsets.fromLTRB(
+                28,
+                0,
+                28,
+                math.max(MediaQuery.of(context).padding.bottom, 12.0) + 8.0,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -226,7 +231,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   Widget _buildSlideItem(OnboardingSlideData slide, Size size) {
-    final imageHeight = (size.height * 0.38).clamp(240.0, 320.0);
+    final imageHeight = (size.height * 0.38).clamp(240.0, 340.0);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -250,15 +255,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     children: [
                       // Soft Ambient Radial Glow
                       Container(
-                        width: size.width * 0.68,
-                        height: imageHeight * 0.75,
+                        width: size.width * 0.75,
+                        height: imageHeight * 0.85,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: slide.accentColor.withValues(alpha: 0.18),
-                              blurRadius: 46,
-                              spreadRadius: 8,
+                              color: slide.accentColor.withValues(alpha: 0.20),
+                              blurRadius: 52,
+                              spreadRadius: 10,
                             ),
                           ],
                         ),
@@ -276,7 +281,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               Colors.black,
                               Colors.transparent,
                             ],
-                            stops: [0.0, 0.72, 0.88, 1.0],
+                            stops: [0.0, 0.65, 0.85, 1.0],
                           ).createShader(bounds);
                         },
                         blendMode: BlendMode.dstIn,
@@ -292,7 +297,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             errorBuilder: (context, error, stackTrace) =>
                                 const Icon(
                               Icons.image_rounded,
-                              size: 72,
+                              size: 80,
                               color: AppColors.primary,
                             ),
                           ),
@@ -305,25 +310,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             },
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
 
           // ── Title & Description ──
           Text(
             slide.title,
             textAlign: TextAlign.center,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 24,
+              fontSize: 23,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
               height: 1.25,
-              letterSpacing: -0.4,
+              letterSpacing: -0.3,
             ),
           ),
 
           const SizedBox(height: 12),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               slide.description,
               textAlign: TextAlign.center,

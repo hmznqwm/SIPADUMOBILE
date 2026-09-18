@@ -7,75 +7,84 @@ import bcrypt
 import requests
 import secrets
 
-from core.config import SUPABASE_URL, SB_HEADERS
+from core.config import SUPABASE_URL, SUPABASE_KEY, SB_HEADERS
+from core.security import sanitize_supabase_param
+import logging
+
+logger = logging.getLogger("smartschedule.master")
 
 def sync_user_to_supabase(user_data: dict):
     try:
         url = f"{SUPABASE_URL}/rest/v1/users"
         requests.post(url, headers=SB_HEADERS, json=user_data, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to sync user to Supabase: {e}")
 
 def delete_user_from_supabase(user_id: str):
     try:
-        url = f"{SUPABASE_URL}/rest/v1/users?id=eq.{user_id}"
+        safe_id = sanitize_supabase_param(user_id)
+        url = f"{SUPABASE_URL}/rest/v1/users?id=eq.{safe_id}"
         requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to delete user from Supabase: {e}")
 
 def patch_user_priority_in_supabase(user_id: str, priority: bool):
     try:
-        url = f"{SUPABASE_URL}/rest/v1/users?id=eq.{user_id}"
+        safe_id = sanitize_supabase_param(user_id)
+        url = f"{SUPABASE_URL}/rest/v1/users?id=eq.{safe_id}"
         headers = {
             "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
             "Content-Type": "application/json"
         }
         requests.patch(url, headers=headers, json={"is_priority": priority}, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to patch user priority in Supabase: {e}")
 
 def sync_gedung_to_supabase(gedung_data: dict):
     try:
         url = f"{SUPABASE_URL}/rest/v1/gedung"
         requests.post(url, headers=SB_HEADERS, json=gedung_data, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to sync gedung to Supabase: {e}")
 
 def delete_gedung_from_supabase(gedung_id: str):
     try:
-        url = f"{SUPABASE_URL}/rest/v1/gedung?id=eq.{gedung_id}"
+        safe_id = sanitize_supabase_param(gedung_id)
+        url = f"{SUPABASE_URL}/rest/v1/gedung?id=eq.{safe_id}"
         requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to delete gedung from Supabase: {e}")
 
 def sync_ruangan_to_supabase(ruangan_data: dict):
     try:
         url = f"{SUPABASE_URL}/rest/v1/ruangan"
         requests.post(url, headers=SB_HEADERS, json=ruangan_data, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to sync ruangan to Supabase: {e}")
 
 def delete_ruangan_from_supabase(ruangan_id: str):
     try:
-        url = f"{SUPABASE_URL}/rest/v1/ruangan?id=eq.{ruangan_id}"
+        safe_id = sanitize_supabase_param(ruangan_id)
+        url = f"{SUPABASE_URL}/rest/v1/ruangan?id=eq.{safe_id}"
         requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to delete ruangan from Supabase: {e}")
 
 def sync_matkul_to_supabase(matkul_data: dict):
     try:
         url = f"{SUPABASE_URL}/rest/v1/mata_kuliah"
         requests.post(url, headers=SB_HEADERS, json=matkul_data, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to sync matkul to Supabase: {e}")
 
 def delete_matkul_from_supabase(matkul_id: str):
     try:
-        url = f"{SUPABASE_URL}/rest/v1/mata_kuliah?id=eq.{matkul_id}"
+        safe_id = sanitize_supabase_param(matkul_id)
+        url = f"{SUPABASE_URL}/rest/v1/mata_kuliah?id=eq.{safe_id}"
         requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to delete matkul from Supabase: {e}")
 
 router = APIRouter(prefix="/master", tags=["Master Data"])
 

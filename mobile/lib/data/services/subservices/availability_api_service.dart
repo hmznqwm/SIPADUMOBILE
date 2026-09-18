@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../config/api_config.dart';
 import '../../models/availability_model.dart';
 import '../../models/ajuan_pengajaran_model.dart';
@@ -18,6 +21,7 @@ class AvailabilityApiService {
 
   /// GET /api/availability/index.php
   Future<AvailabilityModel> getAvailability(String dosenId, String semesterId) async {
+    // 1. Coba lewat backend Python
     if (!ApiConfig.useMockBackend) {
       try {
         final res = await _httpHelper.makeOnlineRequest('/availability/index.php?dosen_id=$dosenId&semester_id=$semesterId');
@@ -28,6 +32,40 @@ class AvailabilityApiService {
         }
       } catch (_) {}
     }
+
+    // 2. Direct Supabase Cloud Fallback
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/availability?dosen_id=eq.$dosenId&semester_id=eq.$semesterId&select=*,availability_slots(*)');
+      final resp = await http.get(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 6));
+
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is List && decoded.isNotEmpty) {
+          final raw = decoded.first as Map<String, dynamic>;
+          final slots = (raw['availability_slots'] as List? ?? [])
+              .map((s) => (s['slot_id'] ?? '').toString())
+              .where((s) => s.isNotEmpty)
+              .toList();
+          final model = AvailabilityModel(
+            id: raw['id'] ?? 'AVL_$dosenId',
+            dosenId: raw['dosen_id'] ?? dosenId,
+            semesterId: raw['semester_id'] ?? semesterId,
+            selectedSlotIds: slots,
+            status: raw['status'] ?? 'submitted',
+            submittedAt: raw['submitted_at'] != null ? DateTime.tryParse(raw['submitted_at']) : DateTime.now(),
+          );
+          MockDatabase.currentAvailability = model;
+          return model;
+        }
+      }
+    } catch (_) {}
 
     await Future.delayed(const Duration(milliseconds: 100));
     if (MockDatabase.currentAvailability != null) {
@@ -144,6 +182,45 @@ class AvailabilityApiService {
       ),
     );
 
+    // Direct Supabase Cloud Sync
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/availability');
+      await http.post(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: jsonEncode({
+          'id': availability.id,
+          'dosen_id': dosenId,
+          'semester_id': semesterId,
+          'status': 'submitted',
+          'submitted_at': DateTime.now().toIso8601String(),
+        }),
+      ).timeout(const Duration(seconds: 5));
+
+      if (selectedSlotIds.isNotEmpty) {
+        final slotUri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/availability_slots');
+        final slotsPayload = selectedSlotIds.map((sid) => {
+          'availability_id': availability.id,
+          'slot_id': sid,
+        }).toList();
+        await http.post(
+          slotUri,
+          headers: {
+            'apikey': ApiConfig.supabasePublishableKey,
+            'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates',
+          },
+          body: jsonEncode(slotsPayload),
+        ).timeout(const Duration(seconds: 5));
+      }
+    } catch (_) {}
+
     return availability;
   }
 
@@ -185,11 +262,27 @@ class AvailabilityApiService {
   }
 
   Future<bool> getSubmissionWindowStatus() async {
+    bool? localCached;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      localCached = prefs.getBool('cached_is_submission_active');
+      if (localCached != null) {
+        MockDatabase.isSubmissionActive = localCached;
+      }
+    } catch (_) {}
+
     if (!ApiConfig.useMockBackend) {
       try {
         final data = await _httpHelper.makeOnlineRequest('/availability/status.php');
         if (data is Map && data['status'] == 'success' && data['isActive'] != null) {
-          MockDatabase.isSubmissionActive = (data['isActive'] == true);
+          final serverActive = (data['isActive'] == true);
+          if (localCached == null) {
+            MockDatabase.isSubmissionActive = serverActive;
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('cached_is_submission_active', serverActive);
+            } catch (_) {}
+          }
           return MockDatabase.isSubmissionActive;
         }
       } catch (_) {}
@@ -206,12 +299,19 @@ class AvailabilityApiService {
 
   Future<void> setSubmissionWindowStatus(bool active) async {
     MockDatabase.isSubmissionActive = active;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('cached_is_submission_active', active);
+    } catch (_) {}
+
     if (!ApiConfig.useMockBackend) {
-      await _httpHelper.makeOnlineRequest(
-        '/availability/status.php',
-        method: 'POST',
-        body: {'active': active},
-      );
+      try {
+        await _httpHelper.makeOnlineRequest(
+          '/availability/status.php',
+          method: 'POST',
+          body: {'active': active},
+        );
+      } catch (_) {}
     }
     await Future.delayed(const Duration(milliseconds: 150));
   }
@@ -248,30 +348,30 @@ class AvailabilityApiService {
     String? prodi,
     String? status,
   }) async {
-    if (!ApiConfig.useMockBackend) {
-      try {
-        final queryParams = <String>[];
-        if (dosenId != null && dosenId.isNotEmpty) queryParams.add('dosenId=$dosenId');
-        if (fakultas != null && fakultas.isNotEmpty) queryParams.add('fakultas=${Uri.encodeComponent(fakultas)}');
-        if (prodi != null && prodi.isNotEmpty) queryParams.add('prodi=${Uri.encodeComponent(prodi)}');
-        if (status != null && status.isNotEmpty) queryParams.add('status=$status');
-
-        final qs = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
-        final data = await _httpHelper.makeOnlineRequest('/ajuan/index.php$qs');
-        if (data is Map && data['status'] == 'success' && data['data'] != null) {
-          final list = (data['data'] as List)
-              .map((a) => AjuanPengajaranModel.fromJson(a))
-              .toList();
-          if (list.isNotEmpty) {
-            MockDatabase.ajuanPengajaranList
-              ..clear()
-              ..addAll(list);
-            return list;
-          }
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/ajuan_pengajaran?select=*');
+      final resp = await http.get(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 4));
+      if (resp.statusCode == 200) {
+        final decoded = jsonDecode(resp.body);
+        if (decoded is List && decoded.isNotEmpty) {
+          final list = decoded.map((a) => AjuanPengajaranModel.fromJson(Map<String, dynamic>.from(a))).toList();
+          MockDatabase.ajuanPengajaranList
+            ..clear()
+            ..addAll(list);
+          await MockDatabase.saveLocalAjuan();
         }
-      } catch (_) {}
-    }
+      }
+    } catch (_) {}
+
     await MockDatabase.initLocalCache();
+    MockDatabase.purgeInvalidSchedules();
     await Future.delayed(const Duration(milliseconds: 150));
     final filtered = MockDatabase.ajuanPengajaranList.where((a) {
       final isGedungDeleted = MockDatabase.deletedGedungIds.contains(a.gedungNama);
@@ -293,6 +393,7 @@ class AvailabilityApiService {
 
   /// SUBMIT New Teaching Proposal
   Future<AjuanPengajaranModel> submitAjuanPengajaran(AjuanPengajaranModel ajuan) async {
+    // 1. Coba lewat backend Python
     if (!ApiConfig.useMockBackend) {
       try {
         final data = await _httpHelper.makeOnlineRequest(
@@ -308,6 +409,46 @@ class AvailabilityApiService {
         }
       } catch (_) {}
     }
+
+    // 2. Direct Supabase Cloud Sync
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/ajuan_pengajaran');
+      await http.post(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: jsonEncode({
+          'id': ajuan.id,
+          'dosen_id': ajuan.dosenId,
+          'dosen_nama': ajuan.dosenNama,
+          'fakultas_nama': ajuan.fakultasNama,
+          'jurusan_nama': ajuan.jurusanNama,
+          'mata_kuliah_id': ajuan.mataKuliahId,
+          'mata_kuliah_nama': ajuan.mataKuliahNama,
+          'sks': ajuan.sks,
+          'semester': ajuan.semester,
+          'kelas_nama': ajuan.kelasNama,
+          'jumlah_mahasiswa': ajuan.jumlahMahasiswa,
+          'gedung_nama': ajuan.gedungNama,
+          'ruangan_nama': ajuan.ruanganNama,
+          'hari': ajuan.hari,
+          'jam_mulai': ajuan.jamMulai,
+          'jam_selesai': ajuan.jamSelesai,
+          'status': ajuan.status,
+          'catatan_dosen': ajuan.catatanDosen,
+          'catatan_kaprodi': ajuan.catatanKaProdi,
+          'catatan_dekan': ajuan.catatanDekan,
+          'catatan_admin': ajuan.catatanAdmin,
+          'alasan_penolakan': ajuan.alasanPenolakan,
+          'bentrok_detail': ajuan.bentrokDetail,
+        }),
+      ).timeout(const Duration(seconds: 5));
+    } catch (_) {}
+
     await Future.delayed(const Duration(milliseconds: 250));
     MockDatabase.ajuanPengajaranList.insert(0, ajuan);
     MockDatabase.dosenSubmissionStatus[ajuan.dosenId] = 'Diajukan';
@@ -316,6 +457,7 @@ class AvailabilityApiService {
 
   /// UPDATE Teaching Proposal
   Future<AjuanPengajaranModel> updateAjuanPengajaran(AjuanPengajaranModel updated) async {
+    // 1. Backend Python
     if (!ApiConfig.useMockBackend) {
       try {
         final data = await _httpHelper.makeOnlineRequest(
@@ -332,6 +474,34 @@ class AvailabilityApiService {
         }
       } catch (_) {}
     }
+
+    // 2. Direct Supabase Cloud Sync
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/ajuan_pengajaran?id=eq.${updated.id}');
+      await http.patch(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'status': updated.status,
+          'gedung_nama': updated.gedungNama,
+          'ruangan_nama': updated.ruanganNama,
+          'hari': updated.hari,
+          'jam_mulai': updated.jamMulai,
+          'jam_selesai': updated.jamSelesai,
+          'catatan_dosen': updated.catatanDosen,
+          'catatan_kaprodi': updated.catatanKaProdi,
+          'catatan_dekan': updated.catatanDekan,
+          'catatan_admin': updated.catatanAdmin,
+          'alasan_penolakan': updated.alasanPenolakan,
+          'bentrok_detail': updated.bentrokDetail,
+        }),
+      ).timeout(const Duration(seconds: 5));
+    } catch (_) {}
+
     await Future.delayed(const Duration(milliseconds: 200));
     final index = MockDatabase.ajuanPengajaranList.indexWhere((a) => a.id == updated.id);
     if (index != -1) {
@@ -346,14 +516,40 @@ class AvailabilityApiService {
 
   /// DELETE Teaching Proposal
   Future<void> deleteAjuanPengajaran(String ajuanId) async {
+    // 1. Backend Python
     if (!ApiConfig.useMockBackend) {
       try {
         await _httpHelper.makeOnlineRequest('/ajuan/index.php?id=$ajuanId', method: 'DELETE');
       } catch (_) {}
     }
+
+    // 2. Direct Supabase Cloud
+    try {
+      final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/ajuan_pengajaran?id=eq.$ajuanId');
+      await http.delete(
+        uri,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      final uriJadwal = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/jadwal_final?or=(id.eq.$ajuanId,id.eq.JDW_$ajuanId)');
+      await http.delete(
+        uriJadwal,
+        headers: {
+          'apikey': ApiConfig.supabasePublishableKey,
+          'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+        },
+      ).timeout(const Duration(seconds: 5));
+    } catch (_) {}
+
     await Future.delayed(const Duration(milliseconds: 150));
     MockDatabase.ajuanPengajaranList.removeWhere((a) => a.id == ajuanId);
+    MockDatabase.jadwalFinal.removeWhere((j) => j.id == ajuanId || j.id == 'JDW_$ajuanId');
+    MockDatabase.jadwalGlobalMaster.removeWhere((j) => j.id == ajuanId || j.id == 'JDW_$ajuanId');
     await MockDatabase.saveLocalAjuan();
+    await MockDatabase.saveLocalJadwal();
   }
 
   /// DELETE Multiple Teaching Proposals
@@ -374,8 +570,34 @@ class AvailabilityApiService {
         }
       }
     }
+    try {
+      for (final id in ajuanIds) {
+        final uri = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/ajuan_pengajaran?id=eq.$id');
+        await http.delete(
+          uri,
+          headers: {
+            'apikey': ApiConfig.supabasePublishableKey,
+            'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          },
+        ).timeout(const Duration(seconds: 3));
+
+        final uriJadwal = Uri.parse('${ApiConfig.supabaseUrl}/rest/v1/jadwal_final?or=(id.eq.$id,id.eq.JDW_$id)');
+        await http.delete(
+          uriJadwal,
+          headers: {
+            'apikey': ApiConfig.supabasePublishableKey,
+            'Authorization': 'Bearer ${ApiConfig.supabasePublishableKey}',
+          },
+        ).timeout(const Duration(seconds: 3));
+      }
+    } catch (_) {}
+
     await Future.delayed(const Duration(milliseconds: 150));
     MockDatabase.ajuanPengajaranList.removeWhere((a) => ajuanIds.contains(a.id));
+    MockDatabase.jadwalFinal.removeWhere((j) => ajuanIds.contains(j.id) || ajuanIds.any((id) => j.id == 'JDW_$id'));
+    MockDatabase.jadwalGlobalMaster.removeWhere((j) => ajuanIds.contains(j.id) || ajuanIds.any((id) => j.id == 'JDW_$id'));
+    await MockDatabase.saveLocalAjuan();
+    await MockDatabase.saveLocalJadwal();
   }
 
   /// KaProdi Verify & Forward to Dekan

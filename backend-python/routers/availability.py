@@ -7,7 +7,11 @@ from datetime import datetime
 import secrets
 import requests
 
-from core.config import SUPABASE_URL, SB_HEADERS
+from core.config import SUPABASE_URL, SUPABASE_KEY, SB_HEADERS
+from core.security import sanitize_supabase_param
+import logging
+
+logger = logging.getLogger("smartschedule.availability")
 
 def sync_availability_to_supabase(avail_id: str, dosen_id: str, semester_id: str, status: str, slot_ids: list):
     try:
@@ -21,14 +25,15 @@ def sync_availability_to_supabase(avail_id: str, dosen_id: str, semester_id: str
         }
         requests.post(url, headers=SB_HEADERS, json=payload, timeout=5)
         # Delete old slots and insert new
-        del_url = f"{SUPABASE_URL}/rest/v1/availability_slots?availability_id=eq.{avail_id}"
+        safe_id = sanitize_supabase_param(avail_id)
+        del_url = f"{SUPABASE_URL}/rest/v1/availability_slots?availability_id=eq.{safe_id}"
         requests.delete(del_url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
         if slot_ids:
             slot_url = f"{SUPABASE_URL}/rest/v1/availability_slots"
             slots_payload = [{"availability_id": avail_id, "slot_id": str(sid)} for sid in slot_ids]
             requests.post(slot_url, headers=SB_HEADERS, json=slots_payload, timeout=5)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to sync availability to Supabase: {e}")
 
 router = APIRouter(prefix="/availability", tags=["Availability"])
 
@@ -114,32 +119,47 @@ async def submit_availability(request: Request, db: Session = Depends(get_db)):
     sync_availability_to_supabase(avail.id, dosen_id, semester_id, avail.status, slot_ids)
     return {"status": "success", "message": "Ketersediaan waktu dosen berhasil disimpan."}
 
-# ─── STATUS WINDOW SAKELAR ─────────────────────────────────────────────
+_in_memory_status = {"submission_window_active": "1"}
+
 @router.get("/status")
 @router.get("/status.php")
 def get_submission_window_status(db: Session = Depends(get_db)):
-    setting = db.query(Setting).filter(Setting.setting_key == "submission_window_active").first()
     is_active = True
-    if setting:
-        is_active = setting.setting_value in ["1", "true", "True"]
+    try:
+        setting = db.query(Setting).filter(Setting.setting_key == "submission_window_active").first()
+        if setting:
+            is_active = setting.setting_value in ["1", "true", "True"]
+        else:
+            val = _in_memory_status.get("submission_window_active", "1")
+            is_active = val in ["1", "true", "True"]
+    except Exception:
+        val = _in_memory_status.get("submission_window_active", "1")
+        is_active = val in ["1", "true", "True"]
     return {"status": "success", "isActive": is_active, "is_active": is_active}
 
 @router.post("/status")
 @router.post("/status.php")
 async def set_submission_window_status(request: Request, db: Session = Depends(get_db)):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
     active_val = body.get("active")
     if active_val is None:
         active_val = body.get("isActive", True)
     
     val_str = "1" if bool(active_val) else "0"
-    setting = db.query(Setting).filter(Setting.setting_key == "submission_window_active").first()
-    if not setting:
-        setting = Setting(setting_key="submission_window_active", setting_value=val_str)
-        db.add(setting)
-    else:
-        setting.setting_value = val_str
-    db.commit()
+    _in_memory_status["submission_window_active"] = val_str
+    try:
+        setting = db.query(Setting).filter(Setting.setting_key == "submission_window_active").first()
+        if not setting:
+            setting = Setting(setting_key="submission_window_active", setting_value=val_str)
+            db.add(setting)
+        else:
+            setting.setting_value = val_str
+        db.commit()
+    except Exception:
+        pass
     return {"status": "success", "isActive": bool(active_val), "is_active": bool(active_val)}
 
 def patch_availability_status_in_supabase(dosen_id: str, new_status: str):

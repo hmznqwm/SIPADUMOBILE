@@ -356,3 +356,112 @@ void showConflictWarningDialog(
     ),
   );
 }
+
+/// Widget komponen untuk tata letak rapi detail pengajuan (Waktu, Mahasiswa, Ruangan, Kelas & Sem)
+/// Menggantikan string tunggal dengan bullet titik di tengah.
+class AjuanCardDetailGrid extends StatelessWidget {
+  final String hari;
+  final String waktuFormatted;
+  final String kelasNama;
+  final int jumlahMahasiswa;
+  final int semester;
+  final String ruanganNama;
+  final String gedungNama;
+
+  const AjuanCardDetailGrid({
+    super.key,
+    required this.hari,
+    required this.waktuFormatted,
+    required this.kelasNama,
+    required this.jumlahMahasiswa,
+    required this.semester,
+    required this.ruanganNama,
+    required this.gedungNama,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          // Baris 1: Waktu & Jam (Kiri) vs Jumlah Mahasiswa (Kanan)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  '$hari, $waktuFormatted',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$jumlahMahasiswa Mhs',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2563EB),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 6),
+
+          // Baris 2: Ruangan & Gedung (Kiri) vs Badges Kelas & Sem (Kanan)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Ruang: $ruanganNama ($gedungNama)',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F766E),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Kelas $kelasNama',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1D4ED8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+

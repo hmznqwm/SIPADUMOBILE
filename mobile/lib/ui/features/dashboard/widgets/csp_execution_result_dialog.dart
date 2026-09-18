@@ -22,12 +22,27 @@ class CspExecutionResultDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalAssigned = report['total_scheduled'] ?? report['totalAssigned'] ?? 0;
-    final totalSlot = report['total_courses'] ?? report['total_slots'] ?? totalAssigned;
-    final conflicts = report['conflicts_count'] ?? report['conflicts'] ?? 0;
-    final submittedDosen = report['submitted_dosen_count'] ?? report['submittedDosen'] ?? 0;
-    final autoDosen = report['auto_assigned_dosen_count'] ?? report['autoAssignedDosen'] ?? 0;
-    final successRate = (report['success_rate'] ?? 100.0).toDouble();
+    int safeInt(dynamic val, [int fallback = 0]) {
+      if (val == null) return fallback;
+      if (val is int) return val;
+      if (val is num) return val.toInt();
+      if (val is List) return val.length;
+      return int.tryParse(val.toString()) ?? fallback;
+    }
+
+    double safeDouble(dynamic val, [double fallback = 100.0]) {
+      if (val == null) return fallback;
+      if (val is double) return val;
+      if (val is num) return val.toDouble();
+      return double.tryParse(val.toString()) ?? fallback;
+    }
+
+    final totalAssigned = safeInt(report['total_scheduled'] ?? report['totalAssigned'] ?? report['approvedCount']);
+    final totalSlot = safeInt(report['total_courses'] ?? report['total_slots'] ?? report['totalProcessed'], totalAssigned);
+    final conflicts = safeInt(report['conflicts_count'] ?? report['conflictCount'] ?? (report['conflicts'] is List ? (report['conflicts'] as List).length : 0));
+    final submittedDosen = safeInt(report['submitted_dosen_count'] ?? report['submittedDosen'] ?? report['submittedLecturersCount']);
+    final autoDosen = safeInt(report['auto_assigned_dosen_count'] ?? report['autoAssignedDosen'] ?? report['autoAllocatedLecturersCount']);
+    final successRate = safeDouble(report['success_rate'], totalSlot > 0 ? (totalAssigned / totalSlot * 100) : 100.0);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -64,7 +79,7 @@ class CspExecutionResultDialog extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Hasil Eksekusi SCP',
+                          'Hasil Eksekusi CSP',
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,

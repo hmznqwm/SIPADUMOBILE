@@ -48,7 +48,7 @@ class MatkulMasterList extends StatelessWidget {
         MapEntry('Kode Matkul', (m['kode'] ?? '-').toString()),
         MapEntry('Nama Matkul', (m['nama'] ?? '-').toString()),
         MapEntry('Bobot SKS', '${m['sks'] ?? 3} SKS'),
-        MapEntry('Dosen Pengampu', (m['dosen'] ?? '-').toString()),
+        MapEntry('Dosen Pengampu', (m['dosen'] ?? m['dosenNama'] ?? m['dosen_nama'] ?? '-').toString()),
         MapEntry('Fakultas / Unit', (m['fakultas'] ?? '-').toString()),
         MapEntry('Daftar Kelas', kelasStr),
       ],
@@ -162,7 +162,7 @@ class MatkulMasterList extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Dosen: ${m['dosen'] ?? '-'}',
+                        'Dosen: ${m['dosen'] ?? m['dosenNama'] ?? m['dosen_nama'] ?? '-'}',
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

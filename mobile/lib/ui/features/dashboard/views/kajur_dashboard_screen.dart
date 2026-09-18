@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../../config/constants.dart';
 import '../../../../data/mock/mock_database.dart';
 import '../../../../data/models/ajuan_pengajaran_model.dart';
+import '../../../../data/models/mata_kuliah_model.dart';
 import '../../../../data/services/api_service.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../widgets/csp_confirmation_dialog.dart';
@@ -47,11 +48,15 @@ class _KaProdiDashboardViewState extends State<KaProdiDashboardView> {
         _jurusanNama = user.jurusanNama;
       }
 
+      final api = context.read<ApiService>();
       await MockDatabase.initLocalCache(forceReload: true);
 
-      final api = context.read<ApiService>();
       final allAjuan = await api.getAjuanPengajaranList();
-      final prodiAjuan = allAjuan.where((a) => a.jurusanNama == _jurusanNama).toList();
+      final prodiAjuan = allAjuan.where((a) {
+        final ajJur = a.jurusanNama.toLowerCase();
+        final targetJur = _jurusanNama.toLowerCase();
+        return ajJur.contains(targetJur) || targetJur.contains(ajJur);
+      }).toList();
 
       // ── Dosen: baca dari master data user (bukan dari ajuan) ──
       final allUsers = await api.getAllUsers();
@@ -68,27 +73,31 @@ class _KaProdiDashboardViewState extends State<KaProdiDashboardView> {
       final allGedung = await api.getGedungList();
       final effectiveGedung = allGedung.isNotEmpty ? allGedung : MockDatabase.gedungList;
 
-      // ── Matkul: baca dari matkulData master (bukan dari ajuan) ──
-      final prodiMatkul = MockDatabase.matkulData.where((m) {
-        final jur = (m['jurusan'] ?? m['jurusanNama'] ?? '').toString().toLowerCase();
+      // ── Matkul: baca dari live getAllMataKuliah() Supabase/Backend ──
+      final allMatkul = await api.getAllMataKuliah();
+      final effectiveMatkul = allMatkul.isNotEmpty
+          ? allMatkul
+          : MockDatabase.matkulData.map((m) => MataKuliahModel.fromJson(m)).toList();
+      final prodiMatkul = effectiveMatkul.where((m) {
+        final jur = m.jurusanNama.toLowerCase();
         final targetJur = _jurusanNama.toLowerCase();
-        if (jur.isEmpty) return true; // jika belum diset jurusannya, tampilkan juga
+        if (jur.isEmpty) return true;
         return jur.contains(targetJur) || targetJur.contains(jur);
       }).toList();
 
-      // ── Kelas/Rombel: ambil semua kelas unik dari field 'kelas' tiap matkul prodi ──
+      // ── Kelas/Rombel: ambil semua kelas unik dari field kelasNama tiap matkul prodi ──
       final Set<String> kelasSet = {};
       for (final m in prodiMatkul) {
-        final kelasList = m['kelas'];
-        if (kelasList is List) {
-          for (final k in kelasList) {
-            final kStr = k.toString().trim();
-            if (kStr.isNotEmpty) kelasSet.add(kStr);
-          }
+        for (final k in m.kelasNama) {
+          final kStr = k.trim();
+          if (kStr.isNotEmpty) kelasSet.add(kStr);
         }
       }
+      if (kelasSet.isEmpty) {
+        kelasSet.addAll(['Kelas A', 'Kelas B']);
+      }
 
-      debugPrint('KAPRODI_DEBUG: _jurusanNama=$_jurusanNama, allUsers=${allUsers.length}, prodiDosen=${prodiDosen.length}, matkulData=${MockDatabase.matkulData.length}, prodiMatkul=${prodiMatkul.length}, kelasSet=${kelasSet.length}');
+      debugPrint('KAPRODI_DEBUG: _jurusanNama=$_jurusanNama, allUsers=${allUsers.length}, prodiDosen=${prodiDosen.length}, effectiveMatkul=${effectiveMatkul.length}, prodiMatkul=${prodiMatkul.length}, kelasSet=${kelasSet.length}');
 
       if (mounted) {
         setState(() {
@@ -109,12 +118,142 @@ class _KaProdiDashboardViewState extends State<KaProdiDashboardView> {
     }
   }
 
+  bool get _isProdiAllApprovedAndConflictFree {
+    if (_prodiAjuanList.isEmpty) return true;
+    final unapprovedOrPending = _prodiAjuanList.where((a) =>
+        a.status != 'disetujui_admin' &&
+        a.status != 'disetujui' &&
+        a.status != 'banding_disetujui');
+    final bentrok = _prodiAjuanList.where((a) =>
+        a.status == 'bentrok_terdeteksi' ||
+        (a.bentrokDetail != null && a.bentrokDetail!.trim().isNotEmpty));
+    return unapprovedOrPending.isEmpty && bentrok.isEmpty;
+  }
+
   Future<void> _runProdiCSPEngine() async {
+    if (_isProdiAllApprovedAndConflictFree) {
+      final forceRun = await showModalBottomSheet<bool>(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.primary,
+                      size: 26,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Jadwal Prodi Rapi & Optimal',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Prodi $_jurusanNama (0 Bentrok)',
+                          style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Text(
+                  'Seluruh pengajuan dosen internal Program Studi $_jurusanNama telah disetujui dan 0 bentrok terdeteksi. Tidak ada jadwal yang perlu dirapikan oleh Engine CSP.',
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF334155), height: 1.45),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text(
+                        'Tutup',
+                        style: TextStyle(color: Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text(
+                        'Tetap Re-Generate',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+
+      if (forceRun != true || !mounted) return;
+    }
+
     final confirm = await CspConfirmationDialog.show(
       context,
       scopeTitle: 'Program Studi $_jurusanNama',
       scopeDescription:
-          'Engine SCP prodi akan menyelaraskan ajuan jadwal dosen internal $_jurusanNama sebelum diajukan ke Dekan.',
+          'Engine CSP prodi akan menyelaraskan ajuan jadwal dosen internal $_jurusanNama sebelum diajukan ke Dekan.',
       roleLabel: 'Ketua Program Studi (KaProdi)',
     );
     if (confirm != true || !mounted) return;

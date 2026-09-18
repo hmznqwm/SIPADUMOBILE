@@ -17,6 +17,29 @@ class SlotWaktuModel {
     required this.durasiMenit,
   });
 
+  factory SlotWaktuModel.fromJson(Map<String, dynamic> json) {
+    return SlotWaktuModel(
+      id: json['id']?.toString() ?? '',
+      hari: json['hari']?.toString() ?? 'Senin',
+      jamMulai: json['jamMulai']?.toString() ?? json['jam_mulai']?.toString() ?? '07:30',
+      jamSelesai: json['jamSelesai']?.toString() ?? json['jam_selesai']?.toString() ?? '10:00',
+      durasiMenit: int.tryParse(json['durasiMenit']?.toString() ?? json['durasi_menit']?.toString() ?? '150') ?? 150,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'hari': hari,
+      'jamMulai': jamMulai,
+      'jam_mulai': jamMulai,
+      'jamSelesai': jamSelesai,
+      'jam_selesai': jamSelesai,
+      'durasiMenit': durasiMenit,
+      'durasi_menit': durasiMenit,
+    };
+  }
+
   String get label => '$jamMulai - $jamSelesai';
 
   @override
