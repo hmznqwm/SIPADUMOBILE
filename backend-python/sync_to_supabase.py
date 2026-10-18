@@ -1,10 +1,14 @@
+import os
 import sqlite3
 import requests
 import json
 import bcrypt
 
-SUPABASE_URL = "https://wxrsstdnlpzonqcaqagv.supabase.co"
-SUPABASE_KEY = "sb_secret_" + "jGMLt3WS6-BcxV9bn6LHww_V8gS3wus"
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://wxrsstdnlpzonqcaqagv.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+if not SUPABASE_KEY:
+    raise ValueError("Variabel lingkungan SUPABASE_KEY belum disetel. Harap setel SUPABASE_KEY di file .env atau env runtime.")
+
 HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",

@@ -1,8 +1,11 @@
+import os
 import requests
 import bcrypt
 
-SUPABASE_URL = "https://wxrsstdnlpzonqcaqagv.supabase.co"
-SECRET_KEY = "sb_secret_" + "jGMLt3WS6-BcxV9bn6LHww_V8gS3wus"
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://wxrsstdnlpzonqcaqagv.supabase.co")
+SECRET_KEY = os.getenv("SUPABASE_KEY")
+if not SECRET_KEY:
+    raise ValueError("Variabel lingkungan SUPABASE_KEY belum disetel. Harap setel SUPABASE_KEY di file .env atau env runtime.")
 
 headers = {
     "apikey": SECRET_KEY,

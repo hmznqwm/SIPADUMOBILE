@@ -3,6 +3,7 @@
 # Deskripsi: Skrip pengujian koneksi dan integritas data langsung ke Supabase Cloud.
 # ==============================================================================
 
+import os
 import json
 import urllib.request
 import urllib.error
@@ -15,8 +16,10 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-SUPABASE_URL = "https://wxrsstdnlpzonqcaqagv.supabase.co"
-SUPABASE_KEY = "sb_secret_" + "jGMLt3WS6-BcxV9bn6LHww_V8gS3wus"
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://wxrsstdnlpzonqcaqagv.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+if not SUPABASE_KEY:
+    raise ValueError("Variabel lingkungan SUPABASE_KEY belum disetel. Harap setel SUPABASE_KEY di file .env atau env runtime.")
 
 HEADERS = {
     "apikey": SUPABASE_KEY,

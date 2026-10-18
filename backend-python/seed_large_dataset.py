@@ -1,10 +1,17 @@
+import os
 import requests
 import json
 import random
 import time
 
-URL = "https://wxrsstdnlpzonqcaqagv.supabase.co/rest/v1"
-KEY = "sb_secret_" + "jGMLt3WS6-BcxV9bn6LHww_V8gS3wus"
+URL = os.getenv("SUPABASE_URL", "https://wxrsstdnlpzonqcaqagv.supabase.co")
+if not URL.endswith("/rest/v1"):
+    URL = f"{URL.rstrip('/')}/rest/v1"
+
+KEY = os.getenv("SUPABASE_KEY")
+if not KEY:
+    raise ValueError("Variabel lingkungan SUPABASE_KEY belum disetel. Harap setel SUPABASE_KEY di file .env atau env runtime.")
+
 HEADERS = {
     "apikey": KEY,
     "Authorization": f"Bearer {KEY}",
