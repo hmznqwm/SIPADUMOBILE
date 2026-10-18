@@ -1,9 +1,13 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from core.database import get_db
 from models.models import Availability, AvailabilitySlot, SlotWaktu, User, Setting
-from datetime import datetime
+from datetime import datetime, timezone
 import secrets
 import requests
 
@@ -21,7 +25,8 @@ def sync_availability_to_supabase(avail_id: str, dosen_id: str, semester_id: str
             "dosen_id": dosen_id,
             "semester_id": semester_id,
             "status": status,
-            "submitted_at": datetime.utcnow().isoformat()
+            "submitted_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
         }
         requests.post(url, headers=SB_HEADERS, json=payload, timeout=5)
         # Delete old slots and insert new
@@ -40,12 +45,20 @@ router = APIRouter(prefix="/availability", tags=["Availability"])
 @router.get("")
 @router.get("/")
 @router.get("/index.php")
-def get_availability(dosenId: Optional[str] = None, semesterId: Optional[str] = "SEM001", db: Session = Depends(get_db)):
+def get_availability(
+    dosenId: Optional[str] = Query(None),
+    dosen_id: Optional[str] = Query(None),
+    semesterId: Optional[str] = Query("SEM001"),
+    semester_id: Optional[str] = Query("SEM001"),
+    db: Session = Depends(get_db)
+):
+    target_dosen = dosenId or dosen_id
+    target_sem = semesterId or semester_id or "SEM001"
     q = db.query(Availability)
-    if dosenId:
-        q = q.filter(Availability.dosen_id == dosenId)
-    if semesterId:
-        q = q.filter(Availability.semester_id == semesterId)
+    if target_dosen:
+        q = q.filter(Availability.dosen_id == target_dosen)
+    if target_sem:
+        q = q.filter(Availability.semester_id == target_sem)
     
     items = q.all()
     data = []
@@ -73,11 +86,17 @@ def get_availability(dosenId: Optional[str] = None, semesterId: Optional[str] = 
 @router.post("/index.php")
 @router.post("/submit.php")
 async def submit_availability(request: Request, db: Session = Depends(get_db)):
+    """
+    [PRESENTASI] Pengisian Ketersediaan Waktu Dosen:
+    Dosen memilih slot waktu kosong yang mereka inginkan (hari & jam tertentu) untuk mengajar.
+    Data ini menjadi salah satu penentu (hard constraint) bagi CSP Engine agar tidak menempatkan dosen
+    di waktu yang mereka tidak bisa mengajar.
+    """
     body = await request.json()
     dosen_id = body.get("dosen_id") or body.get("dosenId")
     if isinstance(dosen_id, dict):
         dosen_id = dosen_id.get("id") or dosen_id.get("dosen_id")
-    raw_slots = body.get("slot_ids") or body.get("slotIds") or []
+    raw_slots = body.get("slot_ids") or body.get("slotIds") or body.get("selectedSlotIds") or body.get("selected_slot_ids") or []
     semester_id = body.get("semester_id") or body.get("semesterId") or "SEM001"
 
     if not dosen_id:
@@ -97,18 +116,21 @@ async def submit_availability(request: Request, db: Session = Depends(get_db)):
         Availability.semester_id == semester_id
     ).first()
 
+    now_utc = datetime.now(timezone.utc)
     if not avail:
-        avail_id = f"AVL_{secrets.token_hex(4).upper()}"
+        avail_id = f"AVL_{dosen_id}_{semester_id}"
         avail = Availability(
             id=avail_id,
             dosen_id=dosen_id,
             semester_id=semester_id,
-            status="submitted"
+            status="submitted",
+            submitted_at=now_utc
         )
         db.add(avail)
         db.flush()
     else:
-        avail.status = "submitted"
+        setattr(avail, "status", "submitted")
+        setattr(avail, "submitted_at", now_utc)
 
     # Sync slots
     db.query(AvailabilitySlot).filter(AvailabilitySlot.availability_id == avail.id).delete()
@@ -116,8 +138,23 @@ async def submit_availability(request: Request, db: Session = Depends(get_db)):
         db.add(AvailabilitySlot(availability_id=avail.id, slot_id=s_id))
 
     db.commit()
-    sync_availability_to_supabase(avail.id, dosen_id, semester_id, avail.status, slot_ids)
-    return {"status": "success", "message": "Ketersediaan waktu dosen berhasil disimpan."}
+    sync_availability_to_supabase(avail.id, dosen_id, semester_id, str(getattr(avail, "status", "submitted")), slot_ids)
+    return {
+        "status": "success",
+        "message": "Ketersediaan waktu dosen berhasil disimpan.",
+        "data": {
+            "id": avail.id,
+            "dosenId": dosen_id,
+            "dosen_id": dosen_id,
+            "semesterId": semester_id,
+            "semester_id": semester_id,
+            "status": str(getattr(avail, "status", "submitted")),
+            "submittedAt": str(getattr(avail, "submitted_at", now_utc)),
+            "submitted_at": str(getattr(avail, "submitted_at", now_utc)),
+            "slotIds": slot_ids,
+            "slot_ids": slot_ids,
+        }
+    }
 
 _in_memory_status = {"submission_window_active": "1"}
 
@@ -128,7 +165,7 @@ def get_submission_window_status(db: Session = Depends(get_db)):
     try:
         setting = db.query(Setting).filter(Setting.setting_key == "submission_window_active").first()
         if setting:
-            is_active = setting.setting_value in ["1", "true", "True"]
+            is_active = str(getattr(setting, "setting_value", "1")) in ["1", "true", "True"]
         else:
             val = _in_memory_status.get("submission_window_active", "1")
             is_active = val in ["1", "true", "True"]
@@ -156,7 +193,7 @@ async def set_submission_window_status(request: Request, db: Session = Depends(g
             setting = Setting(setting_key="submission_window_active", setting_value=val_str)
             db.add(setting)
         else:
-            setting.setting_value = val_str
+            setattr(setting, "setting_value", val_str)
         db.commit()
     except Exception:
         pass
@@ -178,6 +215,11 @@ def patch_availability_status_in_supabase(dosen_id: str, new_status: str):
 @router.post("/verify")
 @router.post("/verify.php")
 async def verify_availability(request: Request, db: Session = Depends(get_db)):
+    """
+    [PRESENTASI] Verifikasi Ketersediaan Waktu:
+    Sama seperti Ajuan Mengajar, ketersediaan waktu dosen juga diverifikasi berjenjang.
+    Kaprodi mengecek apakah waktu yang diminta logis, lalu disahkan oleh Dekan.
+    """
     body = await request.json()
     action = body.get("action", "")
 

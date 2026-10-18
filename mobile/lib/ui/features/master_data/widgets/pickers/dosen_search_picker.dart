@@ -142,9 +142,12 @@ Future<UserModel?> showSearchableDosenPicker({
                     setPickerState(() {
                       if (q.isEmpty) {
                         filteredPickerList = List.from(dosenList);
+                      } else if (q.length < 3) {
+                        filteredPickerList = [];
                       } else {
                         filteredPickerList = dosenList.where((d) {
                           return d.nama.toLowerCase().contains(q) ||
+                              d.id.toLowerCase().contains(q) ||
                               d.jurusanNama.toLowerCase().contains(q) ||
                               d.fakultasNama.toLowerCase().contains(q) ||
                               d.email.toLowerCase().contains(q);
@@ -155,28 +158,61 @@ Future<UserModel?> showSearchableDosenPicker({
                 ),
               ),
               Expanded(
-                child: filteredPickerList.isEmpty
+                child: searchPickerCtrl.text.trim().isNotEmpty &&
+                        searchPickerCtrl.text.trim().length < 3
                     ? Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.search_off_rounded,
-                              size: 40,
-                              color: Colors.grey[400],
+                              Icons.keyboard_outlined,
+                              size: 44,
+                              color: AppColors.primary.withValues(alpha: 0.7),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Dosen "${searchPickerCtrl.text}" tidak ditemukan',
+                            const SizedBox(height: 10),
+                            const Text(
+                              'Ketik Minimal 3 Huruf',
                               style: TextStyle(
-                                fontSize: 12.5,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Ketik ${3 - searchPickerCtrl.text.trim().length} huruf lagi untuk memfilter nama dosen...',
+                              style: TextStyle(
+                                fontSize: 12,
                                 color: Colors.grey[600],
                               ),
                             ),
                           ],
                         ),
                       )
-                    : ListView.separated(
+                    : filteredPickerList.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.search_off_rounded,
+                                  size: 40,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  dosenList.isEmpty
+                                      ? 'Belum ada data dosen terdaftar'
+                                      : 'Dosen "${searchPickerCtrl.text}" tidak ditemukan',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
                           vertical: 4,

@@ -5,6 +5,10 @@
 import '../models/notification_model.dart';
 import '../services/api_service.dart';
 
+/// [PRESENTASI] NotificationRepository:
+/// Repository sederhana untuk abstraksi fitur Notifikasi.
+/// Menyediakan operasi CRUD standar (Ambil, Tandai Dibaca, Hapus) 
+/// tanpa membebani layer presentasi/UI.
 class NotificationRepository {
   final ApiService _apiService;
 

@@ -8,6 +8,7 @@ import '../../../../config/constants.dart';
 class AdminAutomationSection extends StatelessWidget {
   final bool isSubmissionActive;
   final bool isEngineRunning;
+  final bool hasAjuan;
   final bool isAllApprovedAndConflictFree;
   final VoidCallback onRunCSPEngine;
   final ValueChanged<bool> onToggleSubmissionStatus;
@@ -16,6 +17,7 @@ class AdminAutomationSection extends StatelessWidget {
     super.key,
     required this.isSubmissionActive,
     required this.isEngineRunning,
+    this.hasAjuan = true,
     this.isAllApprovedAndConflictFree = false,
     required this.onRunCSPEngine,
     required this.onToggleSubmissionStatus,
@@ -34,51 +36,44 @@ class AdminAutomationSection extends StatelessWidget {
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
 
-        // ── Engine CSP Action Bar ──
+        // ── Unified Merged Card (Duo Control Bento) ──
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: isAllApprovedAndConflictFree
-                ? AppColors.surfaceVariant
-                : Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(
-              color: isAllApprovedAndConflictFree
-                  ? AppColors.primary.withValues(alpha: 0.3)
-                  : const Color(0xFFE2E8F0),
-            ),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x04000000),
                 blurRadius: 4,
-                offset: Offset(0, 1),
+                offset: Offset(0, 2),
               ),
             ],
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Row 1: Engine CSP ──
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(
-                      isAllApprovedAndConflictFree
-                          ? Icons.task_alt_rounded
-                          : Icons.tune_rounded,
-                      color: AppColors.primary,
+                    child: const Icon(
+                      Icons.settings_outlined,
+                      color: Color(0xFF64748B),
                       size: 20,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,139 +81,165 @@ class AdminAutomationSection extends StatelessWidget {
                         const Text(
                           'Engine CSP',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          isAllApprovedAndConflictFree
-                              ? 'Jadwal Rapi & Optimal'
-                              : 'Generate jadwal otomatis',
+                          !hasAjuan
+                              ? 'Belum ada ajuan jadwal'
+                              : isAllApprovedAndConflictFree
+                                  ? 'Jadwal Rapi & Optimal'
+                                  : 'Generate jadwal otomatis',
                           style: const TextStyle(
                             fontSize: 11,
-                            color: AppColors.textSecondary,
+                            color: Color(0xFF64748B),
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
-                    ),
-                    onPressed: isEngineRunning ? null : onRunCSPEngine,
-                    child: isEngineRunning
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              color: Colors.white,
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 90,
+                    height: 34,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: !hasAjuan
+                            ? const Color(0xFFF1F5F9)
+                            : isAllApprovedAndConflictFree
+                                ? const Color(0xFF0F766E)
+                                : AppColors.primary,
+                        foregroundColor: !hasAjuan
+                            ? const Color(0xFF94A3B8)
+                            : Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: (!hasAjuan || isEngineRunning)
+                          ? null
+                          : onRunCSPEngine,
+                      child: isEngineRunning
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              !hasAjuan
+                                  ? 'Data Kosong'
+                                  : isAllApprovedAndConflictFree
+                                      ? 'Jadwal Rapi'
+                                      : 'Jalankan',
+                              style: TextStyle(
+                                fontSize: !hasAjuan ? 11 : 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          )
-                        : Text(
-                            isAllApprovedAndConflictFree ? 'Jadwal Rapi' : 'Jalankan',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
+                    ),
                   ),
                 ],
               ),
-              if (isAllApprovedAndConflictFree) ...[
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+
+              // ── Hairline Divider ──
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Container(
+                  height: 1,
+                  color: const Color(0xFFF1F5F9),
+                ),
+              ),
+
+              // ── Row 2: Window Ketersediaan ──
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.calendar_today_outlined,
+                      color: Color(0xFF64748B),
+                      size: 18,
+                    ),
                   ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 14),
-                      SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Tidak ada jadwal yang perlu dirapikan (Semua pengajuan disetujui & 0 bentrok).',
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Jendela Ketersediaan',
                           style: TextStyle(
-                            fontSize: 10.5,
-                            color: AppColors.primaryDark,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          isSubmissionActive
+                              ? 'Akses dosen terbuka'
+                              : 'Akses dosen ditutup',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // ── Window Submission Lock Toggle ──
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x04000000),
-                blurRadius: 4,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  isSubmissionActive ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isSubmissionActive ? 'Window Ketersediaan: Buka' : 'Window Ketersediaan: Kunci',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
+                  const SizedBox(width: 10),
+                    SizedBox(
+                    width: 90,
+                    height: 34,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isSubmissionActive
+                            ? const Color(0xFFF1F5F9)
+                            : AppColors.primary,
+                        foregroundColor: isSubmissionActive
+                            ? const Color(0xFF0F172A)
+                            : Colors.white,
+                        side: BorderSide(
+                          color: isSubmissionActive
+                              ? const Color(0xFFE2E8F0)
+                              : AppColors.primary,
+                        ),
+                        elevation: 0,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () =>
+                          onToggleSubmissionStatus(!isSubmissionActive),
+                      child: Text(
+                        isSubmissionActive ? 'Matikan' : 'Aktifkan',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                    Text(
-                      isSubmissionActive
-                          ? 'Akses dosen terbuka'
-                          : 'Akses dosen ditutup',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: isSubmissionActive,
-                activeTrackColor: AppColors.primary.withValues(alpha: 0.4),
-                activeThumbColor: AppColors.primary,
-                onChanged: onToggleSubmissionStatus,
+                  ),
+                ],
               ),
             ],
           ),

@@ -7,6 +7,10 @@ import '../models/mata_kuliah_model.dart';
 import '../models/slot_waktu_model.dart';
 import '../services/api_service.dart';
 
+/// [PRESENTASI] AvailabilityRepository:
+/// Repositori ini membungkus kompleksitas API terkait Jadwal Kesediaan Dosen.
+/// Mengabstraksi endpoint pengisian slot waktu, riwayat pengajuan, 
+/// serta validasi SKS agar ViewModel (Business Logic) tetap bersih.
 class AvailabilityRepository {
   final ApiService _apiService;
 
@@ -29,15 +33,26 @@ class AvailabilityRepository {
     required String semesterId,
     required List<String> selectedSlotIds,
     Map<String, SlotTagInfo>? slotTags,
+    List<MataKuliahModel>? mataKuliahList,
+    String? dosenNama,
+    String? dosenJurusan,
+    String? dosenFakultas,
   }) {
     return _apiService.saveAvailability(
       dosenId: dosenId,
       semesterId: semesterId,
       selectedSlotIds: selectedSlotIds,
       slotTags: slotTags,
+      mataKuliahList: mataKuliahList,
+      dosenNama: dosenNama,
+      dosenJurusan: dosenJurusan,
+      dosenFakultas: dosenFakultas,
     );
   }
 
+  /// [PRESENTASI] Pra-Validasi (Client-side/Server-side Hybrid):
+  /// Fungsi krusial untuk memastikan dosen memenuhi syarat minimal SKS mengajar 
+  /// sebelum matriks pengajuan benar-benar dikirimkan dan disimpan ke server.
   Future<({bool valid, int required, int provided, String? message})> validatePreSubmit({
     required String dosenId,
     required List<String> selectedSlotIds,

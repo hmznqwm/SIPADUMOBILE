@@ -7,12 +7,17 @@ import 'package:provider/provider.dart';
 
 import '../../../../config/constants.dart';
 import '../../../core/widgets/info_card.dart';
+import '../../../core/widgets/wave_header_card.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../view_models/dashboard_view_model.dart';
 import 'admin_dashboard_screen.dart';
 import 'kajur_dashboard_screen.dart';
 import 'dekan_dashboard_screen.dart';
 
+/// [PRESENTASI] DashboardScreen (View Layer Utama):
+/// Berfungsi sebagai Router Tampilan yang dinamis. 
+/// Memeriksa role (peran) user dan mengarahkan ke komponen dashboard 
+/// yang relevan (Admin, Dekan, Kajur, Dosen) agar tampilan selalu sesuai otorisasi.
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
 
@@ -70,79 +75,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-              // ── Soft Modern Welcome Card (Light & Elegant) ──
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(AppRadius.full),
-                          ),
-                          child: const Text(
-                            'PORTAL DOSEN',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.yellowSoft,
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                            border: Border.all(color: AppColors.primaryAccent.withValues(alpha: 0.3)),
-                          ),
-                          child: const Text(
-                            'Ganjil 2026/2027',
-                            style: TextStyle(
-                              color: AppColors.primaryAccent,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      user?.nama ?? 'Dosen Pengampu',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'ID: ${user?.id ?? '-'} • ${user?.jurusanNama ?? 'Teknik Informatika'} • ${user?.fakultasNama ?? 'FST'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
+              // ── Solid Primary Green Welcome Card (Split Wave 2-Warna) ──
+              WaveHeaderCard(
+                showBrand: true,
+                title: (user?.nama?.isNotEmpty == true) ? user.nama : 'Dosen Pengampu',
+                subtitle: 'ID: ${(user?.id?.isNotEmpty == true) ? user.id : '-'} • ${(user?.jurusanNama?.isNotEmpty == true) ? user.jurusanNama : '-'} • ${(user?.fakultasNama?.isNotEmpty == true) ? user.fakultasNama : '-'}',
               ),
               const SizedBox(height: AppSpacing.xl),
 
@@ -151,7 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Expanded(
                     child: InfoCard(
-                      icon: Icons.menu_book_outlined,
+                      icon: Icons.book_outlined,
                       label: 'Mata Kuliah',
                       value: '${viewModel.mataKuliahList.length} Matkul',
                       iconColor: AppColors.primary,

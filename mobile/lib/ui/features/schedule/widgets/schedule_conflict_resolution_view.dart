@@ -7,6 +7,9 @@ import '../../auth/view_models/auth_view_model.dart';
 import '../../availability/widgets/ajuan_pengajaran_dialogs.dart';
 import '../view_models/schedule_view_model.dart';
 
+/// [PRESENTASI] ScheduleConflictResolutionView (Antarmuka Resolusi Konflik RCK):
+/// Menampilkan daftar jadwal kuliah yang terdeteksi mengalami konflik/bentrok waktu atau ruangan,
+/// serta permohonan banding dari dosen. Dilengkapi dengan trigger tombol resolusi massal RCK.
 class ScheduleConflictResolutionView extends StatefulWidget {
   final List<AjuanPengajaranModel> allAjuanList;
   final Set<String> selectedConflictIds;
@@ -52,9 +55,13 @@ class _ScheduleConflictResolutionViewState extends State<ScheduleConflictResolut
           (a.status != 'disetujui_admin' && a.status != 'banding_disetujui' && a.bentrokDetail != null && a.bentrokDetail!.isNotEmpty);
       if (!isConflict) return false;
       if (isKaProdi) {
-        if (a.jurusanNama != (user?.jurusanNama ?? 'Teknik Informatika')) return false;
+        if (user != null && user.jurusanNama.isNotEmpty && a.jurusanNama.isNotEmpty) {
+          if (a.jurusanNama.toLowerCase() != user.jurusanNama.toLowerCase()) return false;
+        }
       } else if (isDekan) {
-        if (a.fakultasNama != 'Fakultas Sains & Teknologi') return false;
+        if (user != null && user.fakultasNama.isNotEmpty && a.fakultasNama.isNotEmpty) {
+          if (a.fakultasNama.toLowerCase() != user.fakultasNama.toLowerCase()) return false;
+        }
       }
       seenConflictIds.add(a.id);
       return true;
@@ -71,41 +78,38 @@ class _ScheduleConflictResolutionViewState extends State<ScheduleConflictResolut
       },
       color: AppColors.primary,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 90),
         children: [
           // ── Smart Resolution Button (RCK) ──
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x04000000),
+                  color: Color(0x06000000),
                   blurRadius: 4,
-                  offset: Offset(0, 1),
+                  offset: Offset(0, 2),
                 ),
               ],
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: hasConflicts
-                        ? const Color(0xFFFEF2F2)
-                        : const Color(0xFFF0FDF4),
-                    borderRadius: BorderRadius.circular(8),
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
-                    hasConflicts
-                        ? Icons.published_with_changes_rounded
-                        : Icons.check_circle_outline_rounded,
-                    color: hasConflicts
-                        ? const Color(0xFFDC2626)
-                        : const Color(0xFF059669),
+                  child: const Icon(
+                    Icons.published_with_changes_rounded,
+                    color: Color(0xFF64748B),
                     size: 20,
                   ),
                 ),
@@ -113,16 +117,13 @@ class _ScheduleConflictResolutionViewState extends State<ScheduleConflictResolut
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'RCK - Resolusi & Banding',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      const Text(
+                        'Engine RCK',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 13.5,
                           fontWeight: FontWeight.bold,
-                          color: Colors.teal[900],
+                          color: Color(0xFF0F172A),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -130,80 +131,55 @@ class _ScheduleConflictResolutionViewState extends State<ScheduleConflictResolut
                         hasConflicts
                             ? 'Penyesuaian jadwal & banding'
                             : 'Semua jadwal aman & selaras',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF64748B),
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: hasConflicts ? const Color(0xFFDC2626) : AppColors.textSecondary,
-                          fontWeight: hasConflicts ? FontWeight.w600 : FontWeight.normal,
-                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                if (hasConflicts)
-                  ElevatedButton(
+                const SizedBox(width: 10),
+                SizedBox(
+                  width: 90,
+                  height: 34,
+                  child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       elevation: 0,
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
-                    onPressed: () => widget.onShowBatchResolveDialog(allConflicts),
-                    child: const Text(
-                      'Sesuaikan',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                    ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFA7F3D0)),
-                    ),
-                    child: const Text(
-                      'Selaras',
-                      style: TextStyle(
-                        fontSize: 11,
+                    onPressed: hasConflicts
+                        ? () => widget.onShowBatchResolveDialog(allConflicts)
+                        : null,
+                    child: Text(
+                      hasConflicts ? 'Sesuaikan' : 'Selaras',
+                      style: const TextStyle(
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF059669),
                       ),
                     ),
                   ),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
           // ── Section Title: Pusat Resolusi Konflik ──
-          Row(
-            children: [
-              const Text(
-                'Pusat Resolusi Konflik Jadwal',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: allConflicts.isEmpty ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: allConflicts.isEmpty ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA)),
-                ),
-                child: Text(
-                  '${allConflicts.length} Konflik',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: allConflicts.isEmpty ? const Color(0xFF047857) : const Color(0xFFB91C1C),
-                  ),
-                ),
-              ),
-            ],
+          const Text(
+            'Pusat Resolusi Konflik Jadwal',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 12),
           if (!hasConflicts)
@@ -216,12 +192,23 @@ class _ScheduleConflictResolutionViewState extends State<ScheduleConflictResolut
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Column(
-                children: const [
-                  Icon(Icons.check_circle_outline_rounded, size: 52, color: AppColors.success),
-                  SizedBox(height: 12),
-                  Text('Semua Pengajuan Bebas Bentrok', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                  SizedBox(height: 4),
-                  Text('Seluruh jadwal perkuliahan dosen telah tervalidasi dan siap diterbitkan.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: 44,
+                      color: Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Semua Pengajuan Bebas Bentrok', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                  const SizedBox(height: 4),
+                  const Text('Seluruh jadwal perkuliahan dosen telah tervalidasi dan siap diterbitkan.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                 ],
               ),
             )
@@ -449,29 +436,30 @@ class _ScheduleConflictResolutionViewState extends State<ScheduleConflictResolut
             }),
             if (hasMore)
               Padding(
-                padding: const EdgeInsets.only(top: 14, bottom: 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _displayedCount += 10;
-                      });
-                    },
-                    icon: const Icon(Icons.expand_more_rounded, size: 20),
-                    label: Text(
-                      'Muat 10 Konflik Lagi (${allConflicts.length - visibleConflicts.length} Tersisa)',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                padding: const EdgeInsets.only(top: 10, bottom: 16),
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _displayedCount += 10;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.05),
-                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.2),
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Tampilkan Lainnya',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569),
                       ),
-                      elevation: 0,
                     ),
                   ),
                 ),

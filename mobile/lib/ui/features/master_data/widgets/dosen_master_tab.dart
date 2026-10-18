@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../../config/constants.dart';
 import '../../../../data/models/user_model.dart';
 import 'master_data_dialogs.dart';
 
@@ -13,6 +14,7 @@ class DosenMasterList extends StatelessWidget {
   final bool isMultiSelectMode;
   final int totalSelectedCount;
   final int? limit;
+  final int startIndex;
   final bool isCompact;
   final void Function(String id) onToggleSelect;
   final void Function(String dosenId, bool currentPriority) onTogglePriority;
@@ -28,6 +30,7 @@ class DosenMasterList extends StatelessWidget {
     required this.isMultiSelectMode,
     required this.totalSelectedCount,
     this.limit,
+    this.startIndex = 1,
     this.isCompact = false,
     required this.onToggleSelect,
     required this.onTogglePriority,
@@ -47,7 +50,7 @@ class DosenMasterList extends StatelessWidget {
       icon: Icons.person_outline_rounded,
       details: [
         MapEntry('Nama Lengkap', d.nama),
-        MapEntry('Email / NIDN', d.email),
+        MapEntry('Email', d.email),
         MapEntry('Fakultas', d.fakultasNama),
         MapEntry('Program Studi', d.jurusanNama),
         MapEntry('Mata Kuliah Diampu', matkulStr),
@@ -69,9 +72,9 @@ class DosenMasterList extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 6),
       itemBuilder: (context, index) {
         final d = displayList[index];
-        final isPriority = priorityDosenIds.contains(d.id);
         final isSelected = selectedDosenIds.contains(d.id);
-        final matkulStr = d.matkulNama ?? 'Algoritma & Pemrograman';
+        final isPriority = priorityDosenIds.contains(d.id);
+        final matkulStr = (d.matkulNama != null && d.matkulNama!.isNotEmpty) ? d.matkulNama! : '-';
         Offset tapPos = Offset.zero;
 
         return GestureDetector(
@@ -95,37 +98,49 @@ class DosenMasterList extends StatelessWidget {
               onEdit: () => onEdit(d),
               onDelete: () => onDelete(d),
               onBatchDelete: () => onBatchDelete(d.id),
+              isPriority: isPriority,
+              onTogglePriority: () => onTogglePriority(d.id, isPriority),
             );
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFF059669).withValues(alpha: 0.08) : Colors.white,
+              color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: isSelected
-                    ? const Color(0xFF059669)
-                    : (isPriority ? const Color(0xFF059669).withValues(alpha: 0.5) : const Color(0xFFE2E8F0)),
+                    ? AppColors.primary
+                    : (isPriority ? const Color(0xFFF59E0B).withValues(alpha: 0.4) : const Color(0xFFE2E8F0)),
                 width: isSelected ? 1.5 : 1.0,
               ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: isSelected
-                      ? const Color(0xFF059669)
-                      : (isPriority ? const Color(0xFF059669).withValues(alpha: 0.15) : const Color(0xFFF1F5F9)),
-                  child: Icon(
-                    isSelected
-                        ? Icons.check
-                        : (isPriority ? Icons.star_rounded : Icons.person_outline_rounded),
-                    size: 18,
-                    color: isSelected
-                        ? Colors.white
-                        : (isPriority ? const Color(0xFF059669) : const Color(0xFF64748B)),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onToggleSelect(d.id),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primary
+                          : (isPriority ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, size: 14, color: Colors.white)
+                        : Text(
+                            '${startIndex + index}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isPriority ? const Color(0xFFD97706) : const Color(0xFF64748B),
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -141,25 +156,18 @@ class DosenMasterList extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.bold,
-                                color: isSelected ? const Color(0xFF059669) : const Color(0xFF0F172A),
+                                color: isSelected ? AppColors.primary : const Color(0xFF0F172A),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (isPriority) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFECFDF5),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: const Color(0xFFA7F3D0)),
-                              ),
-                              child: const Text(
-                                'Prioritas MRV',
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                              ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.star_rounded,
+                              size: 15,
+                              color: Color(0xFFF59E0B),
                             ),
                           ],
                         ],
@@ -175,19 +183,13 @@ class DosenMasterList extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           'Matkul: $matkulStr',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF059669)),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],
                   ),
-                ),
-                Switch(
-                  value: isPriority,
-                  activeThumbColor: const Color(0xFF059669),
-                  activeTrackColor: const Color(0xFFA7F3D0),
-                  onChanged: (_) => onTogglePriority(d.id, isPriority),
                 ),
               ],
             ),

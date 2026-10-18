@@ -8,7 +8,8 @@ import 'package:provider/provider.dart';
 import '../../../../config/constants.dart';
 import '../../../../data/models/ajuan_pengajaran_model.dart';
 import '../../../../data/services/api_service.dart';
-import '../view_models/availability_view_model.dart';
+import '../../auth/view_models/auth_view_model.dart';
+import '../../../core/widgets/wave_header_card.dart';
 import 'cards/dekan_ajuan_card.dart';
 import 'dialogs/dekan_filter_bottom_sheet.dart';
 import 'ruangan_kosong_section.dart';
@@ -54,14 +55,19 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
   @override
   Widget build(BuildContext context) {
     final api = context.read<ApiService>();
-    final viewModel = context.watch<AvailabilityViewModel>();
-    final isSubmissionActive = viewModel.isSubmissionActive;
-    const String fakultasNama = 'Fakultas Sains & Teknologi';
+    final user = context.read<AuthViewModel>().currentUser;
+    // [BUG FIX] Gunakan fakultas dinamis dari user yang login, bukan hardcode
+    final String fakultasNama = (user != null && user.fakultasNama.isNotEmpty)
+        ? user.fakultasNama
+        : '';
 
-    // Ajuan di lingkungan Fakultas FST
-    final fstAjuanList = widget.liveAjuanList
-        .where((a) => a.fakultasNama == fakultasNama)
-        .toList();
+    // Ajuan di lingkungan Fakultas Dekan yang login
+    // Jika fakultasNama kosong (data user belum lengkap), tampilkan SEMUA ajuan
+    final fstAjuanList = fakultasNama.isEmpty
+        ? widget.liveAjuanList
+        : widget.liveAjuanList
+            .where((a) => a.fakultasNama == fakultasNama)
+            .toList();
 
     // List prodi yang tersedia di FST
     final availableProdis = [
@@ -103,6 +109,15 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
       return matchStatus && matchProdi && matchQuery;
     }).toList();
 
+    // Grouping ajuan per dosen & per jurusan untuk nested slide card
+    final Map<String, List<AjuanPengajaranModel>> dekanGroupedMap = {};
+    for (final aj in filteredAjuan) {
+      final key =
+          '${aj.dosenId.isNotEmpty ? aj.dosenId : aj.dosenNama}_${aj.jurusanNama}';
+      dekanGroupedMap.putIfAbsent(key, () => []).add(aj);
+    }
+    final groupedAjuan = dekanGroupedMap.values.toList();
+
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
       child: SingleChildScrollView(
@@ -116,144 +131,10 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header Panel Persetujuan Dekan FST ──
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.25),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(AppRadius.full),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.meeting_room_outlined,
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'RUANG & AJUAN FST',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () async {
-                          final newStatus = !isSubmissionActive;
-                          await api.setSubmissionWindowStatus(newStatus);
-                          await viewModel.loadAvailabilityData();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  newStatus
-                                      ? 'Window Ketersediaan berhasil DIBUKA.'
-                                      : 'Window Ketersediaan berhasil DIKUNCI.',
-                                ),
-                                backgroundColor: newStatus
-                                    ? AppColors.primaryDark
-                                    : AppColors.error,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSubmissionActive
-                                ? const Color(0xFFECFDF5)
-                                : const Color(0xFFFEF2F2),
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                            border: Border.all(
-                              color: isSubmissionActive
-                                  ? const Color(0xFFA7F3D0)
-                                  : const Color(0xFFFECACA),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isSubmissionActive
-                                    ? Icons.lock_open_rounded
-                                    : Icons.lock_rounded,
-                                size: 12,
-                                color: isSubmissionActive
-                                    ? const Color(0xFF047857)
-                                    : const Color(0xFFDC2626),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                isSubmissionActive
-                                    ? 'Window Open'
-                                    : 'Window Lock',
-                                style: TextStyle(
-                                  color: isSubmissionActive
-                                      ? const Color(0xFF047857)
-                                      : const Color(0xFFDC2626),
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Manajemen Ruangan & Usulan FST',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  const Text(
-                    'Kelola ketersediaan ruangan dan verifikasi usulan jadwal dosen FST.',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11.5,
-                    ),
-                  ),
-                ],
-              ),
+            // ── Header Panel Persetujuan Dekan FST (Split Wave 2-Warna) ──
+            WaveHeaderCard(
+              title: 'Manajemen Ruangan & Usulan ${fakultasNama.isNotEmpty ? fakultasNama : 'Fakultas'}',
+              subtitle: 'Kelola ketersediaan ruangan dan verifikasi usulan jadwal dosen${fakultasNama.isNotEmpty ? ' $fakultasNama' : ''}.',
             ),
             const SizedBox(height: AppSpacing.md),
 
@@ -359,9 +240,6 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
             // ── SUB-TAB 0: DAFTAR RUANGAN KOSONG & GEDUNG ──
             if (_dekanSelectedSubTab == 0)
               RuanganKosongSection(
-                title: 'Status Ketersediaan Ruangan Kampus',
-                subtitle:
-                    'Data ruangan yang siap digunakan di tingkat fakultas.',
                 ruanganList: widget.ruanganList,
               ),
 
@@ -375,76 +253,73 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    // Search Input
-                    TextField(
-                      controller: _dekanSearchController,
-                      onChanged: (val) {
-                        setState(() {
-                          _dekanSearchQuery = val.trim();
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Cari dosen, matkul, ruang...',
-                        hintStyle: const TextStyle(
-                          fontSize: 11.5,
-                          color: Color(0xFF94A3B8),
+                    Expanded(
+                      child: Container(
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
-                        prefixIcon: const Icon(
-                          Icons.search_rounded,
-                          size: 17,
-                          color: AppColors.primary,
-                        ),
-                        suffixIcon: _dekanSearchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(
-                                  Icons.clear_rounded,
-                                  size: 15,
-                                  color: Color(0xFF64748B),
-                                ),
-                                onPressed: () {
-                                  _dekanSearchController.clear();
-                                  setState(() => _dekanSearchQuery = '');
-                                },
-                              )
-                            : null,
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 7,
-                        ),
-                        isDense: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
+                        child: TextField(
+                          controller: _dekanSearchController,
+                          onChanged: (val) {
+                            setState(() {
+                              _dekanSearchQuery = val.trim();
+                            });
+                          },
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            hintText: 'Cari dosen, matkul, ruang...',
+                            hintStyle: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF94A3B8),
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.search_rounded,
+                              size: 17,
+                              color: AppColors.primary,
+                            ),
+                            prefixIconConstraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            suffixIcon: _dekanSearchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(
+                                      Icons.clear_rounded,
+                                      size: 15,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                    onPressed: () {
+                                      _dekanSearchController.clear();
+                                      setState(() => _dekanSearchQuery = '');
+                                    },
+                                  )
+                                : null,
+                            suffixIconConstraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 9,
+                            ),
                           ),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: AppColors.primary,
-                            width: 1.2,
-                          ),
-                        ),
-                      ),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(width: 8),
 
-                    // 2. Button Filter Full-Width (Buka Modal Bottom Sheet dari bawah)
+                    // 2. Button Filter (Buka Modal Bottom Sheet)
                     Builder(
                       builder: (context) {
                         int activeFilterCount = 0;
@@ -469,7 +344,6 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
                             height: 40,
-                            width: double.infinity,
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
                               color: activeFilterCount > 0
@@ -484,6 +358,7 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
                               ),
                             ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   Icons.tune_rounded,
@@ -492,26 +367,21 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
                                       ? AppColors.primary
                                       : const Color(0xFF64748B),
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    activeFilterCount > 0
-                                        ? 'Filter (${_dekanProdiFilter != 'Semua' ? _dekanProdiFilter : ''}${_dekanStatusFilter != 'Semua' ? ', $_dekanStatusFilter' : ''})'
-                                        : 'Filter Prodi & Status Ajuan',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: activeFilterCount > 0
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                      color: activeFilterCount > 0
-                                          ? AppColors.primary
-                                          : const Color(0xFF475569),
-                                    ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Filter',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: activeFilterCount > 0
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: activeFilterCount > 0
+                                        ? AppColors.primary
+                                        : const Color(0xFF475569),
                                   ),
                                 ),
                                 if (activeFilterCount > 0) ...[
+                                  const SizedBox(width: 6),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 6,
@@ -530,15 +400,7 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
                                 ],
-                                Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  size: 20,
-                                  color: activeFilterCount > 0
-                                      ? AppColors.primary
-                                      : const Color(0xFF64748B),
-                                ),
                               ],
                             ),
                           ),
@@ -648,11 +510,13 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredAjuan.length > _displayedCount ? _displayedCount : filteredAjuan.length,
+                  itemCount: groupedAjuan.length > _displayedCount
+                      ? _displayedCount
+                      : groupedAjuan.length,
                   itemBuilder: (context, index) {
-                    final aj = filteredAjuan[index];
+                    final group = groupedAjuan[index];
                     return DekanAjuanCard(
-                      aj: aj,
+                      ajuanList: group,
                       api: api,
                       selectedAjuanIds: widget.selectedAjuanIds,
                       onAjuanTap: widget.onAjuanTap,
@@ -661,31 +525,32 @@ class _DekanAvailabilityTabState extends State<DekanAvailabilityTab> {
                     );
                   },
                 ),
-                if (filteredAjuan.length > _displayedCount)
+                if (groupedAjuan.length > _displayedCount)
                   Padding(
-                    padding: const EdgeInsets.only(top: 14, bottom: 8),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _displayedCount += 10;
-                          });
-                        },
-                        icon: const Icon(Icons.expand_more_rounded, size: 20),
-                        label: Text(
-                          'Muat 10 Ajuan Lagi (${filteredAjuan.length - _displayedCount} Tersisa)',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    padding: const EdgeInsets.only(top: 10, bottom: 8),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _displayedCount += 10;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.05),
-                          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.2),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'Tampilkan Lainnya',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF475569),
                           ),
-                          elevation: 0,
                         ),
                       ),
                     ),

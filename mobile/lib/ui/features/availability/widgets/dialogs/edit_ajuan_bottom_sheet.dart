@@ -9,6 +9,7 @@ import '../../../../../data/models/ajuan_pengajaran_model.dart';
 import '../../../../../data/models/gedung_model.dart';
 import '../../../../../data/models/ruangan_model.dart';
 import '../../../../../data/services/api_service.dart';
+import '../../../../../utils/academic_year_helper.dart';
 
 class EditAjuanBottomSheet {
   /// Menampilkan Form Edit / Sesuaikan Ajuan (Untuk Dosen, KaProdi, Dekan, dan Admin)
@@ -181,6 +182,23 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
         _masterRuangan = ruangan;
       });
     }
+  }
+
+  void _updateAutoJamSelesai() {
+    final sks = int.tryParse(_sksController.text.trim()) ?? 3;
+    final calculated = AcademicYearHelper.calculateJamSelesai(
+      _selectedJamMulai,
+      sks,
+      matkulNama: _mkController.text,
+      ruanganNama: _selectedRuangan,
+    );
+    if (!_jamSelesaiList.contains(calculated)) {
+      _jamSelesaiList.add(calculated);
+      _jamSelesaiList.sort();
+    }
+    setState(() {
+      _selectedJamSelesai = calculated;
+    });
   }
 
   @override
@@ -568,19 +586,6 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        isNew ? Icons.add_chart_rounded : Icons.edit_note_rounded,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         isNew ? 'Tambah Pengajuan Baru' : 'Edit Pengajuan Perkuliahan',
@@ -651,6 +656,7 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                               keyboardType: TextInputType.number,
                               style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                               decoration: _buildInputDecoration('3'),
+                              onChanged: (_) => _updateAutoJamSelesai(),
                               validator: (v) => v == null || v.trim().isEmpty ? 'Wajib' : null,
                             ),
                           ],
@@ -704,7 +710,7 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                   DropdownButtonFormField<String>(
                     initialValue: _days.contains(_selectedHari) ? _selectedHari : _days.first,
                     isExpanded: true,
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: Color(0xFF64748B)),
+                    icon: const SizedBox.shrink(),
                     style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                     decoration: _buildInputDecoration('Pilih Hari'),
                     items: _days
@@ -726,14 +732,17 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                             DropdownButtonFormField<String>(
                               initialValue: _jamMulaiList.contains(_selectedJamMulai) ? _selectedJamMulai : _jamMulaiList.first,
                               isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                              icon: const SizedBox.shrink(),
                               style: const TextStyle(fontSize: 12.5, color: Color(0xFF0F172A)),
                               decoration: _buildInputDecoration('Mulai'),
                               items: _jamMulaiList
                                   .map((j) => DropdownMenuItem(value: j, child: Text('$j WIB', style: const TextStyle(fontSize: 12.5, color: Color(0xFF0F172A)))))
                                   .toList(),
                               onChanged: (val) {
-                                if (val != null) setState(() => _selectedJamMulai = val);
+                                if (val != null) {
+                                  _selectedJamMulai = val;
+                                  _updateAutoJamSelesai();
+                                }
                               },
                             ),
                           ],
@@ -748,7 +757,7 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                             DropdownButtonFormField<String>(
                               initialValue: _jamSelesaiList.contains(_selectedJamSelesai) ? _selectedJamSelesai : _jamSelesaiList.first,
                               isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
+                              icon: const SizedBox.shrink(),
                               style: const TextStyle(fontSize: 12.5, color: Color(0xFF0F172A)),
                               decoration: _buildInputDecoration('Selesai'),
                               items: _jamSelesaiList
@@ -763,6 +772,54 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+
+                  // Badge Durasi SKS (Praktikum 90 mnt vs Teori 50 mnt)
+                  Builder(
+                    builder: (_) {
+                      final isLab = AcademicYearHelper.isPraktikum(
+                        matkulNama: _mkController.text,
+                        ruanganNama: _selectedRuangan,
+                      );
+                      final curSks = int.tryParse(_sksController.text.trim()) ?? 3;
+                      final totalDurasi = AcademicYearHelper.getTotalDurasiMenit(
+                        sks: curSks,
+                        matkulNama: _mkController.text,
+                        ruanganNama: _selectedRuangan,
+                      );
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: isLab ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isLab ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isLab ? Icons.science_outlined : Icons.schedule_rounded,
+                              size: 14,
+                              color: isLab ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Durasi: $totalDurasi Menit • ${isLab ? "90 mnt/SKS (Praktikum/Lab)" : "50 mnt/SKS (Teori)"}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isLab ? const Color(0xFF15803D) : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 16),
 
                   _buildSectionHeader('LOKASI RUANGAN'),
@@ -773,9 +830,15 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                       Expanded(
                         child: InkWell(
                           onTap: () async {
-                            final picked = await _showSearchableGedungPicker(context, currentSelected: _selectedGedung);
+                            final picked = await _showSearchableGedungPicker(
+                              context,
+                              currentSelected: _selectedGedung,
+                            );
                             if (picked != null) {
-                              setState(() => _selectedGedung = picked);
+                              setState(() {
+                                _selectedGedung = picked;
+                                _selectedRuangan = 'Pilih Ruangan';
+                              });
                             }
                           },
                           borderRadius: BorderRadius.circular(8),
@@ -786,27 +849,20 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Gedung Kuliah',
-                                        style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _selectedGedung,
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
+                                const Text(
+                                  'Gedung Kampus',
+                                  style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                                 ),
-                                const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: Color(0xFF64748B)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _selectedGedung,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ],
                             ),
                           ),
@@ -822,7 +878,8 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                               selectedGedung: _selectedGedung,
                             );
                             if (picked != null) {
-                              setState(() => _selectedRuangan = picked);
+                              _selectedRuangan = picked;
+                              _updateAutoJamSelesai();
                             }
                           },
                           borderRadius: BorderRadius.circular(8),
@@ -833,27 +890,20 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Ruang Kelas',
-                                        style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        _selectedRuangan,
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
+                                const Text(
+                                  'Ruang Kelas',
+                                  style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                                 ),
-                                const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: Color(0xFF64748B)),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _selectedRuangan,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ],
                             ),
                           ),
@@ -919,10 +969,10 @@ class _EditAjuanDialogWidgetState extends State<EditAjuanDialogWidget> {
                       final cur = widget.initialAjuan;
                       final ajuan = AjuanPengajaranModel(
                         id: cur?.id ?? 'AJU_${DateTime.now().millisecondsSinceEpoch}',
-                        dosenId: cur?.dosenId ?? widget.dosenId ?? 'DSN001',
-                        dosenNama: cur?.dosenNama ?? widget.dosenNama ?? 'Dosen Pengampu',
-                        fakultasNama: cur?.fakultasNama ?? widget.fakultasNama ?? 'Fakultas Sains & Teknologi',
-                        jurusanNama: cur?.jurusanNama ?? widget.jurusanNama ?? 'Teknik Informatika',
+                        dosenId: cur?.dosenId ?? widget.dosenId ?? '',
+                        dosenNama: cur?.dosenNama ?? widget.dosenNama ?? '',
+                        fakultasNama: cur?.fakultasNama ?? widget.fakultasNama ?? '',
+                        jurusanNama: cur?.jurusanNama ?? widget.jurusanNama ?? '',
                         mataKuliahId: cur?.mataKuliahId ?? 'MK_${DateTime.now().millisecondsSinceEpoch}',
                         mataKuliahNama: _mkController.text.trim(),
                         sks: int.tryParse(_sksController.text.trim()) ?? 3,

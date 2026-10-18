@@ -8,8 +8,8 @@ import 'package:provider/provider.dart';
 import '../../../../config/constants.dart';
 import '../../../../data/models/ajuan_pengajaran_model.dart';
 import '../../../../data/services/api_service.dart';
+import '../../../core/widgets/wave_header_card.dart';
 import '../../auth/view_models/auth_view_model.dart';
-import '../view_models/availability_view_model.dart';
 import 'cards/kajur_ajuan_card.dart';
 import 'dialogs/kajur_filter_bottom_sheet.dart';
 import 'ruangan_kosong_section.dart';
@@ -54,16 +54,14 @@ class _KaProdiAvailabilityTabState extends State<KaProdiAvailabilityTab> {
   @override
   Widget build(BuildContext context) {
     final api = context.read<ApiService>();
-    final viewModel = context.watch<AvailabilityViewModel>();
-    final isSubmissionActive = viewModel.isSubmissionActive;
     final user = context.read<AuthViewModel>().currentUser;
     final String jurusanNama = (user != null && user.jurusanNama.isNotEmpty)
         ? user.jurusanNama
-        : 'Teknik Informatika';
+        : '';
 
     // Ajuan di lingkungan Program Studi KaProdi
     final prodiAjuanList = widget.liveAjuanList
-        .where((a) => a.jurusanNama == jurusanNama)
+        .where((a) => jurusanNama.isEmpty || a.jurusanNama.toLowerCase() == jurusanNama.toLowerCase())
         .toList();
 
     // Filter pengajuan dosen berdasarkan Status dan Search Query
@@ -97,6 +95,15 @@ class _KaProdiAvailabilityTabState extends State<KaProdiAvailabilityTab> {
       return matchStatus && matchQuery;
     }).toList();
 
+    // Grouping ajuan per dosen & per jurusan untuk nested slide card
+    final Map<String, List<AjuanPengajaranModel>> kajurGroupedMap = {};
+    for (final aj in filteredAjuan) {
+      final key =
+          '${aj.dosenId.isNotEmpty ? aj.dosenId : aj.dosenNama}_${aj.jurusanNama}';
+      kajurGroupedMap.putIfAbsent(key, () => []).add(aj);
+    }
+    final groupedAjuan = kajurGroupedMap.values.toList();
+
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
       child: SingleChildScrollView(
@@ -105,151 +112,10 @@ class _KaProdiAvailabilityTabState extends State<KaProdiAvailabilityTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Panel Persetujuan KaProdi
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.25),
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x05000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.meeting_room_outlined,
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'RUANG & AJUAN PRODI',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () async {
-                          final newStatus = !isSubmissionActive;
-                          await api.setSubmissionWindowStatus(newStatus);
-                          await viewModel.loadAvailabilityData();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  newStatus
-                                      ? 'Window Ketersediaan berhasil DIBUKA.'
-                                      : 'Window Ketersediaan berhasil DIKUNCI.',
-                                ),
-                                backgroundColor: newStatus
-                                    ? AppColors.primaryDark
-                                    : AppColors.error,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSubmissionActive
-                                ? const Color(0xFFECFDF5)
-                                : const Color(0xFFFEF2F2),
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                            border: Border.all(
-                              color: isSubmissionActive
-                                  ? const Color(0xFFA7F3D0)
-                                  : const Color(0xFFFECACA),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isSubmissionActive
-                                    ? Icons.lock_open_rounded
-                                    : Icons.lock_rounded,
-                                size: 12,
-                                color: isSubmissionActive
-                                    ? const Color(0xFF047857)
-                                    : const Color(0xFFDC2626),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                isSubmissionActive
-                                    ? 'Window Open'
-                                    : 'Window Lock',
-                                style: TextStyle(
-                                  color: isSubmissionActive
-                                      ? const Color(0xFF047857)
-                                      : const Color(0xFFDC2626),
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Manajemen Ruangan & Usulan $jurusanNama',
-                    style: const TextStyle(
-                      color: Color(0xFF0F172A),
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Kelola ketersediaan ruangan dan verifikasi usulan jadwal dosen $jurusanNama.',
-                    style: const TextStyle(
-                      color: Color(0xFF64748B),
-                      fontSize: 11.5,
-                    ),
-                  ),
-                ],
-              ),
+            // Header Panel Persetujuan KaProdi (Split Wave 2-Warna)
+            WaveHeaderCard(
+              title: 'Manajemen Ruangan & Usulan $jurusanNama',
+              subtitle: 'Kelola ketersediaan ruangan dan verifikasi usulan jadwal dosen $jurusanNama.',
             ),
             const SizedBox(height: 14),
 
@@ -355,8 +221,6 @@ class _KaProdiAvailabilityTabState extends State<KaProdiAvailabilityTab> {
             // SUB-TAB 0: DAFTAR RUANGAN KOSONG & GEDUNG
             if (_kajurSelectedSubTab == 0)
               RuanganKosongSection(
-                title: 'Status Ketersediaan Ruangan Kampus',
-                subtitle: 'Data ruangan yang siap digunakan untuk prodi.',
                 ruanganList: widget.ruanganList,
               ),
 
@@ -370,170 +234,155 @@ class _KaProdiAvailabilityTabState extends State<KaProdiAvailabilityTab> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _kajurSearchController,
-                      onChanged: (val) {
-                        setState(() {
-                          _kajurSearchQuery = val.trim();
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'Cari dosen, matkul, ruang...',
-                        hintStyle: const TextStyle(
-                          fontSize: 11.5,
-                          color: Color(0xFF94A3B8),
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.search_rounded,
-                          size: 17,
-                          color: AppColors.primary,
-                        ),
-                        suffixIcon: _kajurSearchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(
-                                  Icons.clear_rounded,
-                                  size: 15,
-                                  color: Color(0xFF64748B),
-                                ),
-                                onPressed: () {
-                                  _kajurSearchController.clear();
-                                  setState(() => _kajurSearchQuery = '');
-                                },
-                              )
-                            : null,
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 7,
-                        ),
-                        isDense: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: AppColors.primary,
-                            width: 1.2,
-                          ),
-                        ),
+                child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
                       ),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF0F172A),
+                      child: TextField(
+                        controller: _kajurSearchController,
+                        onChanged: (val) {
+                          setState(() {
+                            _kajurSearchQuery = val.trim();
+                          });
+                        },
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: 'Cari dosen, matkul, ruang...',
+                          hintStyle: const TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF94A3B8),
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            size: 17,
+                            color: AppColors.primary,
+                          ),
+                          prefixIconConstraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
+                          suffixIcon: _kajurSearchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.clear_rounded,
+                                    size: 15,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                  onPressed: () {
+                                    _kajurSearchController.clear();
+                                    setState(() => _kajurSearchQuery = '');
+                                  },
+                                )
+                              : null,
+                          suffixIconConstraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 9,
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                  ),
+                  const SizedBox(width: 8),
 
-                    // 2. Button Filter Full-Width (Buka Modal Bottom Sheet dari bawah)
-                    Builder(
-                      builder: (context) {
-                        final bool hasActiveFilter = _kajurStatusFilter != 'Semua';
+                  // 2. Button Filter (Buka Modal Bottom Sheet)
+                  Builder(
+                    builder: (context) {
+                      final bool hasActiveFilter = _kajurStatusFilter != 'Semua';
 
-                        return InkWell(
-                          onTap: () => showKajurFilterBottomSheet(
-                            context: context,
-                            currentStatus: _kajurStatusFilter,
-                            onApply: (status) {
-                              setState(() {
-                                _kajurStatusFilter = status;
-                              });
-                            },
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            height: 40,
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
+                      return InkWell(
+                        onTap: () => showKajurFilterBottomSheet(
+                          context: context,
+                          currentStatus: _kajurStatusFilter,
+                          onApply: (status) {
+                            setState(() {
+                              _kajurStatusFilter = status;
+                            });
+                          },
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: hasActiveFilter
+                                ? AppColors.primary.withValues(alpha: 0.08)
+                                : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
                               color: hasActiveFilter
-                                  ? AppColors.primary.withValues(alpha: 0.08)
-                                  : const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
+                                  ? AppColors.primary
+                                  : const Color(0xFFCBD5E1),
+                              width: hasActiveFilter ? 1.4 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.tune_rounded,
+                                size: 18,
                                 color: hasActiveFilter
                                     ? AppColors.primary
-                                    : const Color(0xFFCBD5E1),
-                                width: hasActiveFilter ? 1.4 : 1.0,
+                                    : const Color(0xFF64748B),
                               ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.tune_rounded,
-                                  size: 18,
+                              const SizedBox(width: 6),
+                              Text(
+                                'Filter',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: hasActiveFilter
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
                                   color: hasActiveFilter
                                       ? AppColors.primary
-                                      : const Color(0xFF64748B),
+                                      : const Color(0xFF475569),
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    hasActiveFilter
-                                        ? 'Filter Status: $_kajurStatusFilter'
-                                        : 'Filter Status Ajuan Dosen',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                              ),
+                              if (hasActiveFilter) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Text(
+                                    '1',
                                     style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: hasActiveFilter
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                      color: hasActiveFilter
-                                          ? AppColors.primary
-                                          : const Color(0xFF475569),
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                                if (hasActiveFilter) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Text(
-                                      '1',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                ],
-                                Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  size: 20,
-                                  color: hasActiveFilter
-                                      ? AppColors.primary
-                                      : const Color(0xFF64748B),
                                 ),
                               ],
-                            ),
+                            ],
                           ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
               ),
               const SizedBox(height: 10),
 
@@ -634,11 +483,13 @@ class _KaProdiAvailabilityTabState extends State<KaProdiAvailabilityTab> {
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredAjuan.length > _displayedCount ? _displayedCount : filteredAjuan.length,
+                  itemCount: groupedAjuan.length > _displayedCount
+                      ? _displayedCount
+                      : groupedAjuan.length,
                   itemBuilder: (context, index) {
-                    final aj = filteredAjuan[index];
+                    final group = groupedAjuan[index];
                     return KajurAjuanCard(
-                      aj: aj,
+                      ajuanList: group,
                       api: api,
                       selectedAjuanIds: widget.selectedAjuanIds,
                       onAjuanTap: widget.onAjuanTap,
@@ -647,31 +498,32 @@ class _KaProdiAvailabilityTabState extends State<KaProdiAvailabilityTab> {
                     );
                   },
                 ),
-                if (filteredAjuan.length > _displayedCount)
+                if (groupedAjuan.length > _displayedCount)
                   Padding(
-                    padding: const EdgeInsets.only(top: 14, bottom: 8),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _displayedCount += 10;
-                          });
-                        },
-                        icon: const Icon(Icons.expand_more_rounded, size: 20),
-                        label: Text(
-                          'Muat 10 Ajuan Lagi (${filteredAjuan.length - _displayedCount} Tersisa)',
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    padding: const EdgeInsets.only(top: 10, bottom: 8),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _displayedCount += 10;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.05),
-                          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.2),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'Tampilkan Lainnya',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF475569),
                           ),
-                          elevation: 0,
                         ),
                       ),
                     ),

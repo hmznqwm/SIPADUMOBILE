@@ -55,8 +55,8 @@ class _DosenAjuanTabState extends State<DosenAjuanTab> {
     }).toList();
 
     final isSelectionMode = widget.selectedAjuanIds.isNotEmpty;
-    final visibleAjuanList = dosenAjuanList.take(_displayedCount).toList();
-    final hasMore = dosenAjuanList.length > visibleAjuanList.length;
+    final visibleAjuans = dosenAjuanList.take(_displayedCount).toList();
+    final hasMore = dosenAjuanList.length > visibleAjuans.length;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -65,6 +65,7 @@ class _DosenAjuanTabState extends State<DosenAjuanTab> {
       },
       color: AppColors.primary,
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
         children: [
           // ── Action Button: Ajukan Jam & Ruang Baru / Warning Locked ──
@@ -115,11 +116,10 @@ class _DosenAjuanTabState extends State<DosenAjuanTab> {
                   : () {
                       AjuanPengajaranDialogs.showCreateDialog(
                         context: context,
-                        dosenId: user?.id ?? 'D001',
-                        dosenNama:
-                            user?.nama ?? 'Dr. Eng. Ir. Budi Santoso, M.T.',
-                        fakultasNama: user?.fakultasNama ?? 'Fakultas Teknik',
-                        jurusanNama: user?.jurusanNama ?? 'Teknik Informatika',
+                        dosenId: user?.id ?? '',
+                        dosenNama: user?.nama ?? '',
+                        fakultasNama: user?.fakultasNama ?? '',
+                        jurusanNama: user?.jurusanNama ?? '',
                         onCreated: (newAjuan) async {
                           await api.submitAjuanPengajaran(newAjuan);
                           widget.onRefresh();
@@ -179,7 +179,7 @@ class _DosenAjuanTabState extends State<DosenAjuanTab> {
                     border: Border.all(color: const Color(0xFFCBD5E1)),
                   ),
                   child: Text(
-                    'Tampil: ${visibleAjuanList.length}/${dosenAjuanList.length}',
+                    'Tampil: ${visibleAjuans.length}/${dosenAjuanList.length} Ajuan',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -230,10 +230,10 @@ class _DosenAjuanTabState extends State<DosenAjuanTab> {
               ),
             )
           else ...[
-            ...visibleAjuanList.map((ajuan) {
-              final isSelected = widget.selectedAjuanIds.contains(ajuan.id);
+            ...visibleAjuans.map((aj) {
+              final isSelected = widget.selectedAjuanIds.contains(aj.id);
               return DosenAjuanCard(
-                ajuan: ajuan,
+                ajuan: aj,
                 user: user,
                 isSelected: isSelected,
                 isSelectionMode: isSelectionMode,
@@ -244,29 +244,30 @@ class _DosenAjuanTabState extends State<DosenAjuanTab> {
             }),
             if (hasMore)
               Padding(
-                padding: const EdgeInsets.only(top: 14, bottom: 8),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _displayedCount += 10;
-                      });
-                    },
-                    icon: const Icon(Icons.expand_more_rounded, size: 20),
-                    label: Text(
-                      'Muat 10 Ajuan Lagi (${dosenAjuanList.length - visibleAjuanList.length} Tersisa)',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                padding: const EdgeInsets.only(top: 10, bottom: 8),
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _displayedCount += 10;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      backgroundColor: AppColors.primary.withValues(alpha: 0.05),
-                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.2),
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Tampilkan Lainnya',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569),
                       ),
-                      elevation: 0,
                     ),
                   ),
                 ),

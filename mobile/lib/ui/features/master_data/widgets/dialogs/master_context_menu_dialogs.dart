@@ -13,142 +13,189 @@ void showCardContextMenu({
   required VoidCallback onEdit,
   required VoidCallback onDelete,
   required VoidCallback onBatchDelete,
+  bool? isPriority,
+  VoidCallback? onTogglePriority,
 }) {
-  final RenderBox? overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
-  final Size screenSize = overlay?.size ?? const Size(400, 800);
-  final Offset targetPos = (tapPosition == Offset.zero)
-      ? Offset(screenSize.width / 2, screenSize.height / 3)
-      : tapPosition;
-
-  showMenu<String>(
+  showDialog(
     context: context,
-    position: RelativeRect.fromRect(
-      targetPos & const Size(40, 40),
-      Offset.zero & screenSize,
-    ),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    elevation: 8,
-    color: Colors.white,
-    items: [
-      PopupMenuItem<String>(
-        enabled: false,
-        height: 38,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              itemTitle,
-              style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
+    barrierColor: Colors.black.withValues(alpha: 0.3),
+    builder: (BuildContext dCtx) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 40,
+                offset: const Offset(0, 15),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              itemCategory,
-              style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 4),
-            const Divider(height: 1, color: Color(0xFFE2E8F0)),
-          ],
-        ),
-      ),
-      if (onViewDetail != null)
-        const PopupMenuItem<String>(
-          value: 'detail',
-          height: 40,
-          child: Row(
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF0284C7)),
-              SizedBox(width: 10),
-              Text(
-                'Lihat Detail',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF0F172A),
+              // Header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.touch_app_rounded, color: AppColors.primary, size: 26),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      itemTitle,
+                      style: const TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      itemCategory,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              // Actions
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  children: [
+                    if (onViewDetail != null)
+                      _buildActionItem(
+                        icon: Icons.info_outline_rounded,
+                        label: 'Lihat Detail',
+                        color: const Color(0xFF0284C7),
+                        onTap: () {
+                          Navigator.pop(dCtx);
+                          onViewDetail();
+                        },
+                      ),
+                    if (onTogglePriority != null)
+                      _buildActionItem(
+                        icon: isPriority == true ? Icons.star_rounded : Icons.star_outline_rounded,
+                        label: isPriority == true ? 'Hapus Prioritas' : 'Jadikan Prioritas',
+                        color: const Color(0xFFF59E0B),
+                        onTap: () {
+                          Navigator.pop(dCtx);
+                          onTogglePriority();
+                        },
+                      ),
+                    _buildActionItem(
+                      icon: Icons.edit_outlined,
+                      label: 'Edit Data',
+                      color: AppColors.primary,
+                      onTap: () {
+                        Navigator.pop(dCtx);
+                        onEdit();
+                      },
+                    ),
+                    _buildActionItem(
+                      icon: Icons.checklist_rtl_rounded,
+                      label: 'Hapus Masal',
+                      color: const Color(0xFF0284C7),
+                      onTap: () {
+                        Navigator.pop(dCtx);
+                        onBatchDelete();
+                      },
+                    ),
+                    _buildActionItem(
+                      icon: Icons.delete_outline_rounded,
+                      label: 'Hapus Data',
+                      color: const Color(0xFFEF4444),
+                      onTap: () {
+                        Navigator.pop(dCtx);
+                        onDelete();
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-      const PopupMenuItem<String>(
-        value: 'edit',
-        height: 40,
+      );
+    },
+  );
+}
+
+Widget _buildActionItem({
+  required IconData icon,
+  required String label,
+  required Color color,
+  required VoidCallback onTap,
+}) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      splashColor: color.withValues(alpha: 0.1),
+      highlightColor: color.withValues(alpha: 0.05),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         child: Row(
           children: [
-            Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
-            SizedBox(width: 10),
-            Text(
-              'Edit Data',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0F172A),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  color: color == const Color(0xFFEF4444) ? color : const Color(0xFF1E293B),
+                ),
               ),
             ),
-          ],
-        ),
-      ),
-      const PopupMenuItem<String>(
-        value: 'delete',
-        height: 40,
-        child: Row(
-          children: [
             Icon(
-              Icons.delete_outline_rounded,
-              size: 18,
-              color: Color(0xFFEF4444),
-            ),
-            SizedBox(width: 10),
-            Text(
-              'Hapus Data',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFFEF4444),
-              ),
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: color == const Color(0xFFEF4444) ? color.withValues(alpha: 0.5) : const Color(0xFFCBD5E1),
             ),
           ],
         ),
       ),
-      const PopupMenuItem<String>(
-        value: 'batch_delete',
-        height: 40,
-        child: Row(
-          children: [
-            Icon(
-              Icons.checklist_rtl_rounded,
-              size: 18,
-              color: Color(0xFF0284C7),
-            ),
-            SizedBox(width: 10),
-            Text(
-              'Hapus Masal',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0284C7),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ],
-  ).then((value) {
-    if (value == 'detail') {
-      onViewDetail?.call();
-    } else if (value == 'edit') {
-      onEdit();
-    } else if (value == 'delete') {
-      onDelete();
-    } else if (value == 'batch_delete') {
-      onBatchDelete();
-    }
-  });
+    ),
+  );
 }
 
 void showMasterDetailInfoDialog({

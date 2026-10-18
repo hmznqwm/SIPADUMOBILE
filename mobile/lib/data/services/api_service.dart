@@ -23,8 +23,10 @@ import 'subservices/notification_api_service.dart';
 
 export 'subservices/api_http_helper.dart' show ApiException;
 
-/// Facade ApiService yang menyatukan seluruh sub-service sistem.
-/// Mempertahankan 100% kompatibilitas kontrak API dengan ChangeNotifier.
+/// [PRESENTASI] Facade ApiService
+/// Kelas ini bertindak sebagai 'pintu tunggal' (Facade) dari seluruh interaksi HTTP aplikasi.
+/// Memusatkan semua panggil API (Auth, Master Data, Schedule) agar UI layer tidak perlu 
+/// pusing mencari sumber data. Mempertahankan 100% kompatibilitas dengan ChangeNotifier.
 class ApiService extends ChangeNotifier {
   final ApiHttpHelper _httpHelper;
   final AuthApiService _authService;
@@ -105,6 +107,8 @@ class ApiService extends ChangeNotifier {
         newPassword: newPassword,
       );
 
+  Future<void> logout() => _authService.logout();
+
   // ══════════════════════════════════════════════
   //  MASTER DATA (Courses, Slots, Users, Buildings, Rooms)
   // ══════════════════════════════════════════════
@@ -171,11 +175,28 @@ class ApiService extends ChangeNotifier {
   Future<List<MataKuliahModel>> getAllMataKuliah() =>
       _masterDataService.getAllMataKuliah();
 
-  Future<void> saveMataKuliah(Map<String, dynamic> matkul) =>
-      _masterDataService.saveMataKuliah(matkul);
+  Future<void> saveMataKuliah(Map<String, dynamic> matkul) async {
+    await _masterDataService.saveMataKuliah(matkul);
+    notifyListeners();
+  }
 
-  Future<void> deleteMataKuliah(String mkId) =>
-      _masterDataService.deleteMataKuliah(mkId);
+  Future<void> deleteMataKuliah(String mkId) async {
+    await _masterDataService.deleteMataKuliah(mkId);
+    notifyListeners();
+  }
+
+  Future<List<Map<String, dynamic>>> getFakultasList() =>
+      _masterDataService.getFakultasList();
+
+  Future<void> saveFakultas(Map<String, dynamic> fakultas) async {
+    await _masterDataService.saveFakultas(fakultas);
+    notifyListeners();
+  }
+
+  Future<void> deleteFakultas(String fakultasId) async {
+    await _masterDataService.deleteFakultas(fakultasId);
+    notifyListeners();
+  }
 
   List<UserModel> getDemoUsers() =>
       _masterDataService.getDemoUsers();
@@ -192,12 +213,20 @@ class ApiService extends ChangeNotifier {
     required String semesterId,
     required List<String> selectedSlotIds,
     Map<String, SlotTagInfo>? slotTags,
+    List<MataKuliahModel>? mataKuliahList,
+    String? dosenNama,
+    String? dosenJurusan,
+    String? dosenFakultas,
   }) async {
     final res = await _availabilityService.saveAvailability(
       dosenId: dosenId,
       semesterId: semesterId,
       selectedSlotIds: selectedSlotIds,
       slotTags: slotTags,
+      mataKuliahList: mataKuliahList,
+      dosenNama: dosenNama,
+      dosenJurusan: dosenJurusan,
+      dosenFakultas: dosenFakultas,
     );
     notifyListeners();
     return res;
@@ -398,6 +427,18 @@ class ApiService extends ChangeNotifier {
       fakultasNama: fakultasNama,
       jurusanNama: jurusanNama,
       role: role,
+    );
+    final approvedCount = res['totalApproved'] ?? 0;
+    final conflictCount = res['totalConflicts'] ?? 0;
+    final scopeLabel = scope == 'jurusan'
+        ? (jurusanNama != null && jurusanNama.isNotEmpty ? 'Prodi $jurusanNama' : 'Prodi')
+        : (scope == 'fakultas' ? (fakultasNama != null && fakultasNama.isNotEmpty ? 'Fakultas $fakultasNama' : 'Fakultas') : 'Institusi Global');
+
+    await _notificationService.sendNotification(
+      userId: 'GLOBAL',
+      title: 'Otomasi Jadwal CSP Selesai ($scopeLabel)',
+      message: 'Engine Penjadwalan Cerdas CSP & Backtracking telah selesai dijalankan. $approvedCount ajuan berhasil disetujui & $conflictCount bentrok.',
+      type: 'success',
     );
     notifyListeners();
     return res;

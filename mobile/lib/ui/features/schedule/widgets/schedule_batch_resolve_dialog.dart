@@ -226,7 +226,11 @@ class ScheduleBatchResolveDialog {
                                               ),
                                               Text(
                                                 '${suggestion['ruanganNama']} (${suggestion['gedungNama']})',
-                                                style: const TextStyle(fontSize: 10, color: Color(0xFF0F766E)),
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: suggestion['ruanganNama']?.contains('RTI') == true ? FontWeight.bold : FontWeight.normal,
+                                                  color: suggestion['ruanganNama']?.contains('RTI') == true ? const Color(0xFF6D28D9) : const Color(0xFF0F766E),
+                                                ),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -236,6 +240,29 @@ class ScheduleBatchResolveDialog {
                                       ],
                                     ),
                                   ),
+                                  if (suggestion['ruanganNama']?.contains('RTI') == true) ...[
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF5F3FF),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFDDD6FE)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.videocam_rounded, size: 13, color: Color(0xFF7C3AED)),
+                                          const SizedBox(width: 5),
+                                          Expanded(
+                                            child: Text(
+                                              'Opsi Terakhir RCK: Ruang fisik penuh \u2022 Dialihkan ke Kelas RTI (Daring) Semester ${aj.semester}',
+                                              style: const TextStyle(fontSize: 10, color: Color(0xFF6D28D9), fontWeight: FontWeight.w600),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             );

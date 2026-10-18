@@ -9,7 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from core.config import settings
 from core.database import get_db
-from models.models import User
+from models.models import User, TokenBlacklist
 import re
 import hmac
 import hashlib
@@ -28,19 +28,25 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def create_access_token(user_id: str, role: str, email: str) -> str:
-    """Membuat JWT access token dengan payload user."""
+    """
+    [PRESENTASI] Membuat JSON Web Token (JWT) setelah pengguna berhasil login.
+    Token ini memuat informasi pengguna (id, role, email) yang telah dienkripsi.
+    Akan kedaluwarsa sesuai waktu yang ditentukan (exp).
+    """
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": user_id,
         "role": role,
         "email": email,
-        "exp": int(expire.timestamp()),
-        "iat": int(datetime.now(timezone.utc).timestamp()),
+        "exp": int(expire.timestamp()), # Waktu kedaluwarsa token
+        "iat": int(datetime.now(timezone.utc).timestamp()), # Waktu token dibuat
     }
     if HAS_JOSE:
+        # Enkripsi dengan pustaka "jose" (Lebih aman dan standar)
         return jwt.encode(payload, settings.JWT_SECRET or "default_sec_jwt", algorithm=settings.ALGORITHM)
     else:
-        # Zero-dependency HMAC fallback
+        # [PRESENTASI] Zero-dependency HMAC fallback:
+        # Membuat dan menandatangani token manual tanpa pustaka eksternal jika "jose" tidak terinstal.
         header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().rstrip("=")
         body = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
         secret = (settings.JWT_SECRET or "default_sec_jwt").encode()
@@ -50,11 +56,16 @@ def create_access_token(user_id: str, role: str, email: str) -> str:
 
 
 def verify_token(token: str) -> dict:
-    """Memverifikasi dan decode JWT token. Raise exception jika invalid."""
+    """
+    [PRESENTASI] Memverifikasi apakah JWT token valid, asli (tidak dimanipulasi), dan belum kedaluwarsa.
+    Jika ada masalah, sistem akan memberikan exception Unauthorized.
+    """
     try:
         if HAS_JOSE:
+            # Pustaka bawaan akan otomatis mengecek masa aktif dan keaslian token
             payload = jwt.decode(token, settings.JWT_SECRET or "default_sec_jwt", algorithms=[settings.ALGORITHM])
         else:
+            # Fallback jika tidak ada pustaka, harus diverifikasi manual komponen per komponen
             parts = token.split(".")
             if len(parts) != 3:
                 raise ValueError("Invalid token format")
@@ -89,8 +100,9 @@ async def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """
-    FastAPI Dependency — Ambil user yang sedang login dari JWT token di header Authorization.
-    Gunakan sebagai: current_user: User = Depends(get_current_user)
+    [PRESENTASI] FastAPI Dependency: Mengambil Data Pengguna yang Sedang Login.
+    Setiap request yang butuh login akan melewati fungsi ini. Mengekstrak token dari header, 
+    memvalidasinya, mengecek blacklist logout, dan menarik objek User dari database.
     """
     if credentials is None:
         raise HTTPException(
@@ -99,9 +111,25 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    payload = verify_token(credentials.credentials)
+    # 1. Cek apakah token berada di dalam daftar Token Blacklist (Logout)
+    token_str = credentials.credentials
+    try:
+        blacklisted = db.query(TokenBlacklist).filter(TokenBlacklist.token == token_str).first()
+        if blacklisted:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"status": "error", "message": "Sesi telah kedaluwarsa atau Anda telah logout. Silakan login kembali."}
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    # 2. Dekode dan pastikan token valid
+    payload = verify_token(token_str)
     user_id = payload.get("sub")
 
+    # 3. Cari data user di database (mengecek apakah user masih terdaftar/aktif)
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(
@@ -113,13 +141,14 @@ async def get_current_user(
 
 def require_role(*allowed_roles: str):
     """
-    FastAPI Dependency factory — Membatasi akses berdasarkan role.
-    Gunakan sebagai: current_user: User = Depends(require_role("admin", "kajur"))
+    [PRESENTASI] RBAC (Role-Based Access Control)
+    Fungsi pelindung endpoint (Dependency factory) yang memblokir akses 
+    jika role pengguna yang sedang login tidak sesuai dengan yang diizinkan (misal: 'admin').
     """
     async def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
+                status_code=status.HTTP_403_FORBIDDEN, # 403 Forbidden: Dilarang akses
                 detail={
                     "status": "error",
                     "message": f"Akses ditolak. Fitur ini hanya untuk role: {', '.join(allowed_roles)}."

@@ -67,100 +67,111 @@ class _DosenMatrixTabState extends State<DosenMatrixTab> {
         const SizedBox(height: 10),
 
         // ── Progress Counter Bar ──
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            children: [
-              Row(
+        Builder(
+          builder: (context) {
+            final need = viewModel.totalRequiredSlots;
+            final have = viewModel.selectedCount;
+            final over = viewModel.isOverQuota;
+            final ok = viewModel.meetsMinimumSks;
+            final statusColor = over
+                ? AppColors.error
+                : (ok ? AppColors.available : AppColors.pending);
+            final statusText = need <= 0
+                ? (have > 0 ? 'Terisi' : 'Belum Diisi')
+                : over
+                    ? 'Lebih ${have - need}'
+                    : (ok ? 'Terpenuhi' : 'Kurang ${need - have}');
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
                 children: [
-                  // Selected count
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: viewModel.meetsMinimumSks
-                                ? AppColors.available
-                                : AppColors.pending,
-                            shape: BoxShape.circle,
-                          ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: statusColor,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$have',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor,
+                              ),
+                            ),
+                            Flexible(
+                              child: Text(
+                                need > 0
+                                    ? ' / $need Slot Dibutuhkan (${viewModel.totalRequiredSks} SKS)'
+                                    : ' Slot Dipilih',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: Color(0xFF64748B),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${viewModel.selectedCount}',
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          statusText,
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: viewModel.meetsMinimumSks
-                                ? AppColors.available
-                                : AppColors.pending,
+                            color: statusColor,
                           ),
                         ),
-                        Text(
-                          ' / ${viewModel.totalRequiredSks} Slot SKS Minimal',
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: need > 0 ? (have / need).clamp(0.0, 1.0) : 0.0,
+                      minHeight: 5,
+                      backgroundColor: const Color(0xFFE2E8F0),
+                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                     ),
                   ),
-                  // Status label
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: viewModel.meetsMinimumSks
-                          ? AppColors.available.withValues(alpha: 0.1)
-                          : AppColors.pending.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      viewModel.meetsMinimumSks
-                          ? 'Terpenuhi'
-                          : 'Belum Cukup',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: viewModel.meetsMinimumSks
-                            ? AppColors.available
-                            : AppColors.pending,
+                  if (need > 0) ...[
+                    const SizedBox(height: 6),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '1 slot = 50 menit. Teori 1 SKS = 1 slot, Praktikum 1 SKS = 2 slot, dihitung per kelas.',
+                        style: TextStyle(fontSize: 10.5, color: Color(0xFF94A3B8)),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: viewModel.totalRequiredSks > 0
-                      ? (viewModel.selectedCount /
-                                viewModel.totalRequiredSks)
-                            .clamp(0.0, 1.0)
-                      : 0.0,
-                  minHeight: 5,
-                  backgroundColor: const Color(0xFFE2E8F0),
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    viewModel.meetsMinimumSks
-                        ? AppColors.available
-                        : AppColors.pending,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
 
         // Error / Success Messages
@@ -573,15 +584,28 @@ class _DosenMatrixTabState extends State<DosenMatrixTab> {
                 Expanded(
                   flex: 2,
                   child: CustomButton(
-                    text: viewModel.availability != null
+                    text: (viewModel.availability?.isSubmitted ?? false)
                         ? 'Simpan Perubahan'
                         : 'Ajukan Ketersediaan',
-                    icon: viewModel.availability != null
+                    icon: (viewModel.availability?.isSubmitted ?? false)
                         ? Icons.save_rounded
                         : Icons.send_rounded,
                     isLoading: viewModel.isSubmitting,
-                    onPressed: () =>
-                        showDosenMatrixSubmitConfirmationDialog(context, viewModel),
+                    onPressed: () {
+                      if (viewModel.isSubmitting) return;
+                      if (!viewModel.meetsMinimumSks) {
+                        final need = viewModel.totalRequiredSlots;
+                        final have = viewModel.selectedCount;
+                        final msg = viewModel.isOverQuota
+                            ? 'Slot berlebih ${have - need}. Lepas slot hingga tepat $need slot.'
+                            : 'Slot kurang ${need - have}. Pilih hingga tepat $need slot.';
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(SnackBar(content: Text(msg)));
+                        return;
+                      }
+                      showDosenMatrixSubmitConfirmationDialog(context, viewModel);
+                    },
                   ),
                 ),
               ],

@@ -1,6 +1,5 @@
 // File: dosen_ajuan_card.dart
-// Deskripsi: Widget kartu pengajuan mengajar khusus role Dosen.
-// Fungsi: Menampilkan rincian ajuan, tombol aksi Detail, Cek Bentrok, Banding, Edit, dan Hapus.
+// Deskripsi: Widget kartu pengajuan mengajar dosen untuk role Dosen.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -34,494 +33,506 @@ class DosenAjuanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final api = context.read<ApiService>();
+    final currentAj = ajuan;
+    final stageColor = getAjuanStageColor(currentAj.status);
+
+    final cleanKelas = currentAj.kelasNama.trim().toLowerCase().startsWith('kelas')
+        ? currentAj.kelasNama.trim()
+        : (currentAj.kelasNama.trim().isNotEmpty ? 'Kelas ${currentAj.kelasNama.trim()}' : '-');
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
-          width: isSelected ? 1.8 : 1.0,
+          color: isSelected ? stageColor : const Color(0xFFE2E8F0),
+          width: isSelected ? 2.0 : 1.0,
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x04000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
+            color: Color(0x0A0F172A),
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15.0),
         child: InkWell(
-          onTap: () => onAjuanTap(
-            ajuan.id,
-            () => AjuanPengajaranDialogs.showDetailDialog(
-              context: context,
-              ajuan: ajuan,
-              currentRole: user?.role ?? 'dosen',
-              onRefresh: onRefresh,
-            ),
-          ),
-          onLongPress: () => onAjuanLongPress(ajuan.id),
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header: Mata Kuliah & SKS Badge
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          onTap: () {
+            if (isSelectionMode) {
+              onAjuanTap(currentAj.id, () {});
+            } else {
+              onAjuanTap(
+                currentAj.id,
+                () => AjuanPengajaranDialogs.showDetailDialog(
+                  context: context,
+                  ajuan: currentAj,
+                  currentRole: 'dosen',
+                  onRefresh: onRefresh,
+                ),
+              );
+            }
+          },
+          onLongPress: () => onAjuanLongPress(currentAj.id),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── 1. HEADER (White Background) ──
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    if (isSelectionMode)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8, top: 2),
-                        child: Icon(
-                          isSelected
-                              ? Icons.check_circle_rounded
-                              : Icons.radio_button_unchecked_rounded,
-                          color: isSelected
-                              ? AppColors.primary
-                              : const Color(0xFF94A3B8),
-                          size: 20,
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        buildDosenAvatar(
+                          dosenId: currentAj.dosenId,
+                          dosenNama: currentAj.dosenNama,
+                          radius: 26,
                         ),
-                      ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.school_rounded,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
+                        if (isSelected)
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: stageColor.withValues(alpha: 0.8),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: const Icon(
+                              Icons.check_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            ajuan.mataKuliahNama,
+                            currentAj.dosenNama,
                             style: const TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
                               color: Color(0xFF0F172A),
+                              letterSpacing: -0.3,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 3),
-                          Text(
-                            ajuan.fakultasNama,
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '${ajuan.sks} SKS',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Sem ${ajuan.semester}',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF475569),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 10),
-                const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                const SizedBox(height: 10),
-
-                AjuanCardDetailGrid(
-                  hari: ajuan.hari,
-                  waktuFormatted: ajuan.waktuFormatted,
-                  kelasNama: ajuan.kelasNama,
-                  jumlahMahasiswa: ajuan.jumlahMahasiswa,
-                  semester: ajuan.semester,
-                  ruanganNama: ajuan.ruanganNama,
-                  gedungNama: ajuan.gedungNama,
-                ),
-
-                // Rejection or Adjustment Notice
-                if (ajuan.alasanPenolakan != null &&
-                    ajuan.alasanPenolakan!.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(9),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.red.withValues(alpha: 0.25),
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.info_outline,
-                          size: 15,
-                          color: Colors.red,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Catatan: ${ajuan.alasanPenolakan}',
-                            style: const TextStyle(
-                              fontSize: 11.5,
-                              color: Colors.red,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
-                const SizedBox(height: 12),
-
-                // Status Badge & Action Buttons
-                Row(
-                  children: [AjuanStatusBadge(status: ajuan.status)],
-                ),
-                const SizedBox(height: 10),
-
-                // ── Dosen Action Buttons (Responsive Grid) ──
-                Column(
-                  children: [
-                    Row(
-                      children: [
-                        // 1. Detail Alur
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              AjuanPengajaranDialogs.showDetailDialog(
-                                context: context,
-                                ajuan: ajuan,
-                                currentRole: user?.role ?? 'dosen',
-                                onRefresh: onRefresh,
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(9),
-                            child: Container(
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(9),
-                                border: Border.all(
-                                  color: const Color(0xFFCBD5E1),
-                                ),
-                              ),
-                              alignment: Alignment.center,
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.visibility_outlined,
-                                    size: 14.5,
-                                    color: Color(0xFF0284C7),
-                                  ),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    'Lihat Detail',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0284C7),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // 2. Cek Bentrok
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              AjuanPengajaranDialogs.showConflictCheckDialog(
-                                context: context,
-                                ajuan: ajuan,
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(9),
-                            child: Container(
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF5F3FF),
-                                borderRadius: BorderRadius.circular(9),
-                                border: Border.all(
-                                  color: const Color(0xFFDDD6FE),
-                                ),
-                              ),
-                              alignment: Alignment.center,
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.event_busy_outlined,
-                                    size: 14.5,
-                                    color: Color(0xFF7C3AED),
-                                  ),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    'Cek Bentrok',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF7C3AED),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (ajuan.status == 'disetujui_admin' ||
-                        ajuan.status == 'banding_disetujui') ...[
-                      const SizedBox(height: 7),
-                      InkWell(
-                        onTap: () {
-                          AjuanPengajaranDialogs.showBandingDialog(
-                            context: context,
-                            ajuan: ajuan,
-                            onConfirmBanding: (alasan, hari, jam) async {
-                              await api.submitBandingAjuan(
-                                ajuanId: ajuan.id,
-                                alasan: alasan,
-                                preferensiHari: hari,
-                                preferensiJam: jam,
-                              );
-                              onRefresh();
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Permohonan banding jadwal berhasil dikirimkan ke Admin.',
-                                    ),
-                                    backgroundColor: AppColors.primary,
-                                  ),
-                                );
-                              }
-                            },
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(9),
-                        child: Container(
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF7ED),
-                            borderRadius: BorderRadius.circular(9),
-                            border: Border.all(
-                              color: const Color(0xFFFED7AA),
-                            ),
-                          ),
-                          alignment: Alignment.center,
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          const SizedBox(height: 4),
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            runSpacing: 4,
                             children: [
-                              Icon(
-                                Icons.history_toggle_off_rounded,
-                                size: 14.5,
-                                color: Color(0xFFEA580C),
-                              ),
-                              SizedBox(width: 5),
                               Text(
-                                'Ajukan Banding Jadwal',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFEA580C),
+                                currentAj.dosenId.isNotEmpty ? currentAj.dosenId : '0412087601',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const Text(
+                                '•',
+                                style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE0F2F1),
+                                  borderRadius: BorderRadius.circular(100),
+                                  border: Border.all(color: const Color(0xFFB2DFDB)),
+                                ),
+                                child: Text(
+                                  currentAj.jurusanNama.isNotEmpty ? currentAj.jurusanNama : 'Jurusan',
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF00695C),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
+                        ],
                       ),
-                    ] else if (ajuan.status == 'menunggu_banding') ...[
-                      const SizedBox(height: 7),
-                      Container(
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF7ED),
-                          borderRadius: BorderRadius.circular(9),
-                          border: Border.all(
-                            color: const Color(0xFFFED7AA),
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── 2. BODY KARTU (Jadwal Diajukan - Light Gray) ──
+              Container(
+                color: const Color(0xFFF8FAFC),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'JADWAL DIAJUKAN',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF94A3B8),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x050F172A),
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
                           ),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.hourglass_top_rounded,
-                              size: 14.5,
-                              color: Color(0xFFEA580C),
-                            ),
-                            SizedBox(width: 5),
-                            Text(
-                              'Banding Sedang Ditinjau Admin',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFEA580C),
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
-                    ] else ...[
-                      const SizedBox(height: 7),
-                      Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          // 3. Edit Ajuan
-                          Expanded(
-                            child: InkWell(
-                              onTap: () {
-                                AjuanPengajaranDialogs.showEditDialog(
-                                  context: context,
-                                  ajuan: ajuan,
-                                  currentRole: user?.role ?? 'dosen',
-                                  onSaved: (updated) async {
-                                    await api.updateAjuanPengajaran(updated);
-                                    onRefresh();
-                                  },
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(9),
-                              child: Container(
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEFF6FF),
-                                  borderRadius: BorderRadius.circular(9),
-                                  border: Border.all(
-                                    color: const Color(0xFFBFDBFE),
+                          // Top Sub-header
+                          Container(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            decoration: const BoxDecoration(
+                              border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'MATA KULIAH POKOK',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF94A3B8),
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
-                                alignment: Alignment.center,
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.edit_outlined,
-                                      size: 14.5,
-                                      color: AppColors.primary,
-                                    ),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      'Edit',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ],
+                                const SizedBox(height: 4),
+                                Text(
+                                  currentAj.mataKuliahNama,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0F172A),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'TIF-${currentAj.mataKuliahId} | ${currentAj.sks} SKS | Teori & Praktik',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          if (ajuan.status == 'menunggu_kaprodi' ||
-                              ajuan.status.startsWith('ditolak')) ...[
-                            const SizedBox(width: 8),
-                            // 4. Hapus Ajuan
-                            Expanded(
-                              child: InkWell(
-                                onTap: () => _confirmDeleteAjuan(context, api),
-                                borderRadius: BorderRadius.circular(9),
+                          const SizedBox(height: 12),
+                          
+                          // Grid Semester & Kelas
+                          Row(
+                            children: [
+                              Expanded(
                                 child: Container(
-                                  height: 36,
+                                  padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFFEF2F2),
-                                    borderRadius: BorderRadius.circular(9),
-                                    border: Border.all(
-                                      color: const Color(0xFFFECACA),
-                                    ),
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFF1F5F9)),
                                   ),
-                                  alignment: Alignment.center,
-                                  child: const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Icon(
-                                        Icons.delete_outline_rounded,
-                                        size: 14.5,
-                                        color: Colors.red,
-                                      ),
-                                      SizedBox(width: 5),
-                                      Text(
-                                        'Hapus',
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.red,
-                                        ),
-                                      ),
+                                      const Text('TINGKAT SEMESTER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
+                                      const SizedBox(height: 2),
+                                      Text('Semester ${currentAj.semester}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
                                     ],
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFF1F5F9)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text('ALOKASI KELAS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
+                                      const SizedBox(height: 2),
+                                      Text(cleanKelas, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Hari & Tanggal
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFF1F5F9)),
                             ),
-                          ],
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('HARI & TANGGAL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
+                                const SizedBox(height: 2),
+                                Text('${currentAj.hari}, 12 Oktober 2026', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Waktu
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFF1F5F9)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('WAKTU PERKULIAHAN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
+                                const SizedBox(height: 2),
+                                Text(currentAj.waktuFormatted, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Ruangan
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFF1F5F9)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('RUANGAN & TEMPAT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8))),
+                                    const Text('Tersedia', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text('${currentAj.gedungNama} — ${currentAj.ruanganNama}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                                const SizedBox(height: 6),
+                                const Divider(color: Color(0xFFE2E8F0), height: 1),
+                                const SizedBox(height: 6),
+                                const Text('Kapasitas 40 Kursi | Fasilitas Smart TV & AC', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
+
+              // ── 3. FOOTER ACTION BAR (4 Buttons Grid) ──
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF334155),
+                              backgroundColor: const Color(0xFFF8FAFC),
+                              side: const BorderSide(color: Color(0xFFE2E8F0)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: () => AjuanPengajaranDialogs.showConflictCheckDialog(
+                              context: context,
+                              ajuan: currentAj,
+                            ),
+                            child: const Text('Cek Bentrok', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF334155),
+                              backgroundColor: const Color(0xFFF8FAFC),
+                              side: const BorderSide(color: Color(0xFFE2E8F0)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: () => AjuanPengajaranDialogs.showDetailDialog(
+                              context: context,
+                              ajuan: currentAj,
+                              currentRole: 'dosen',
+                              onRefresh: onRefresh,
+                            ),
+                            child: const Text('Detail', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFBE123C),
+                              backgroundColor: const Color(0xFFFFF1F2),
+                              side: const BorderSide(color: Color(0xFFFDA4AF)),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: () {
+                              _confirmDeleteAjuan(context, context.read<ApiService>(), currentAj);
+                            },
+                            child: const Text('Hapus', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildPrimaryActionButton(context, currentAj),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Future<void> _confirmDeleteAjuan(BuildContext context, ApiService api) async {
+  Widget _buildPrimaryActionButton(BuildContext context, AjuanPengajaranModel aj) {
+    final api = context.read<ApiService>();
+    final conflictInfo = api.checkBuildingConflict(aj);
+    final isConflict = aj.status == 'bentrok_terdeteksi' ||
+        conflictInfo['hasConflict'] == true ||
+        (aj.status != 'disetujui_admin' &&
+            aj.status != 'banding_disetujui' &&
+            aj.bentrokDetail != null &&
+            aj.bentrokDetail!.isNotEmpty);
+
+    if (isConflict || aj.status == 'bentrok_terdeteksi' || aj.status.startsWith('ditolak')) {
+      return ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF7C3AED),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 2,
+        ),
+        onPressed: () {
+          AjuanPengajaranDialogs.showBandingDialog(
+            context: context,
+            ajuan: aj,
+            onConfirmBanding: (alasan, prefHari, prefJam) async {
+              await api.submitBandingAjuan(
+                ajuanId: aj.id,
+                alasan: alasan,
+                preferensiHari: prefHari,
+                preferensiJam: prefJam,
+              );
+              onRefresh();
+            },
+          );
+        },
+        child: const Text('Banding Jadwal', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+      );
+    }
+
+    if (aj.status == 'menunggu_banding') {
+      return ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFF3E8FF),
+          foregroundColor: const Color(0xFF7C3AED),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 0,
+        ),
+        onPressed: null,
+        child: const Text('Ditinjau Banding', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+      );
+    }
+
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        elevation: 2,
+      ),
+      onPressed: () {
+        AjuanPengajaranDialogs.showEditDialog(
+          context: context,
+          ajuan: aj,
+          currentRole: user?.role ?? 'dosen',
+          onSaved: (updated) {
+            onRefresh();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Data ajuan berhasil diperbarui!'),
+                  backgroundColor: AppColors.primary,
+                ),
+              );
+            }
+          },
+        );
+      },
+      child: const Text('Sesuaikan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Future<void> _confirmDeleteAjuan(BuildContext context, ApiService api, AjuanPengajaranModel aj) async {
     final confirm = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -593,7 +604,7 @@ class DosenAjuanCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Apakah Anda yakin ingin menghapus pengajuan mata kuliah "${ajuan.mataKuliahNama}"?',
+              'Apakah Anda yakin ingin menghapus pengajuan mata kuliah "${aj.mataKuliahNama}"?',
               style: const TextStyle(
                 fontSize: 13,
                 color: Color(0xFF334155),
@@ -652,8 +663,9 @@ class DosenAjuanCard extends StatelessWidget {
       ),
     );
     if (confirm == true) {
-      await api.deleteAjuanPengajaran(ajuan.id);
+      await api.deleteAjuanPengajaran(aj.id);
       onRefresh();
     }
   }
 }
+

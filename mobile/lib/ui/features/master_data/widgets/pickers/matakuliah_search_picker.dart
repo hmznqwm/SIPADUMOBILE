@@ -13,15 +13,6 @@ Future<String?> showSearchableMatkulPicker({
 
   List<String> matkulList =
       matkulData.map((m) => '${m['kode']} - ${m['nama']}').toList();
-  if (matkulList.isEmpty) {
-    matkulList = [
-      'IF101 - Algoritma & Pemrograman',
-      'IF302 - Kecerdasan Buatan (AI)',
-      'SI201 - Basis Data Lanjut',
-      'MN101 - Pengantar Manajemen',
-      'AK201 - Akuntansi Biaya',
-    ];
-  }
 
   final Set<String> selectedSet = (currentSelected ?? '')
       .split(', ')
@@ -65,7 +56,7 @@ Future<String?> showSearchableMatkulPicker({
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
-                        Icons.book_rounded,
+                        Icons.book_outlined,
                         color: AppColors.primary,
                         size: 20,
                       ),
@@ -162,28 +153,62 @@ Future<String?> showSearchableMatkulPicker({
                 ),
               ),
               Expanded(
-                child: filteredList.isEmpty
+                child: matkulList.isEmpty
                     ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.search_off_rounded,
-                              size: 40,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Mata kuliah "${searchPickerCtrl.text}" tidak ditemukan',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                color: Colors.grey[600],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.menu_book_outlined,
+                                size: 44,
+                                color: Colors.grey[400],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 10),
+                              const Text(
+                                'Belum Ada Data Mata Kuliah',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Silakan tambahkan data mata kuliah terlebih dahulu di menu Master Data.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       )
-                    : ListView.separated(
+                    : filteredList.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.search_off_rounded,
+                                  size: 40,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Mata kuliah "${searchPickerCtrl.text}" tidak ditemukan',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
                           vertical: 4,

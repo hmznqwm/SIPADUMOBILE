@@ -82,8 +82,13 @@ class AvailabilityModel {
     );
   }
 
+  bool get isSubmitted => status == 'submitted' && selectedSlotIds.isNotEmpty;
+
   factory AvailabilityModel.fromJson(Map<String, dynamic> json) {
-    final rawSlots = json['selectedSlotIds'] ?? json['selected_slot_ids'];
+    final rawSlots = json['selectedSlotIds'] ??
+        json['selected_slot_ids'] ??
+        json['slotIds'] ??
+        json['slot_ids'];
     List<String> slotIds = [];
     if (rawSlots is List) {
       slotIds = rawSlots.map((e) => e.toString()).toList();
@@ -105,7 +110,7 @@ class AvailabilityModel {
       semesterId: json['semesterId'] ?? json['semester_id'] ?? 'SEM001',
       selectedSlotIds: slotIds,
       slotTags: tags,
-      status: json['status'] ?? 'submitted',
+      status: json['status'] ?? (slotIds.isNotEmpty ? 'submitted' : 'draft'),
       submittedAt: json['submittedAt'] != null || json['submitted_at'] != null
           ? DateTime.tryParse(json['submittedAt'] ?? json['submitted_at'] ?? '')
           : null,

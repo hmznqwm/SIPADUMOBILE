@@ -46,9 +46,10 @@ Widget buildSearchablePickerField({
   required String placeholder,
   required IconData icon,
   required VoidCallback onTap,
+  VoidCallback? onAdd,
   bool hasValue = true,
 }) {
-  return InkWell(
+  final contentBox = InkWell(
     onTap: onTap,
     borderRadius: BorderRadius.circular(10),
     child: Container(
@@ -115,5 +116,34 @@ Widget buildSearchablePickerField({
         ],
       ),
     ),
+  );
+
+  if (onAdd == null) {
+    return contentBox;
+  }
+
+  return Row(
+    children: [
+      Expanded(child: contentBox),
+      const SizedBox(width: 8),
+      Material(
+        color: AppColors.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onAdd,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            width: 48,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+            ),
+            child: const Icon(Icons.add_rounded, color: AppColors.primary, size: 24),
+          ),
+        ),
+      ),
+    ],
   );
 }

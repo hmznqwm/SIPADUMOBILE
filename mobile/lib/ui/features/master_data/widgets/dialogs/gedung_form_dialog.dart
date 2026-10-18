@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../../config/constants.dart';
 import '../../../../../data/models/gedung_model.dart';
 import '../master_data_pickers.dart';
+import 'quick_add_master_dialogs.dart';
 
 // ── Dialog Tambah Gedung ──
 void showAddGedungDialog({
@@ -128,6 +129,16 @@ void showAddGedungDialog({
                     if (picked != null) {
                       setModalState(() => selectedAkses = picked);
                     }
+                  },
+                  onAdd: () {
+                    showQuickAddFakultasDialog(
+                      context: context,
+                      onAdded: (newFak) {
+                        setModalState(() {
+                          selectedAkses = newFak['nama']?.toString() ?? '';
+                        });
+                      },
+                    );
                   },
                 ),
                 const SizedBox(height: 20),
@@ -294,6 +305,16 @@ void showEditGedungDialog({
                     if (picked != null) {
                       setModalState(() => selectedAkses = picked);
                     }
+                  },
+                  onAdd: () {
+                    showQuickAddFakultasDialog(
+                      context: context,
+                      onAdded: (newFak) {
+                        setModalState(() {
+                          selectedAkses = newFak['nama']?.toString() ?? '';
+                        });
+                      },
+                    );
                   },
                 ),
                 const SizedBox(height: 20),

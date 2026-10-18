@@ -1,7 +1,7 @@
 name: smart_course_scheduler
 description: "Smart Course Scheduler - Aplikasi Penjadwalan Mata Kuliah Cerdas"
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.9.0
@@ -20,17 +20,38 @@ dependencies:
   http: ^1.2.0
   encrypt: ^5.0.3
   google_sign_in: ^6.2.2
-  mailer: ^7.2.0
   shared_preferences: ^2.5.2
   image_picker: ^1.1.2
+  bcrypt: ^1.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
 
 flutter:
   uses-material-design: true
   assets:
     - assets/logo/
     - assets/images/onboarding/
+    - assets/images/profiles/
+    - assets/images/dashboard/
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/logo/iconaplikasi.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/logo/iconaplikasi.png"
+  web:
+    generate: true
+    image_path: "assets/logo/iconaplikasi.png"
+    background_color: "#FFFFFF"
+    theme_color: "#1E3A8A"
+  windows:
+    generate: true
+    image_path: "assets/logo/iconaplikasi.png"
+    icon_size: 48
+

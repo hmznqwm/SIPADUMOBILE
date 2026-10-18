@@ -1,5 +1,5 @@
 // File: admin_stat_cards.dart
-// Deskripsi: Widget kartu statistik institusi kampus pada Dashboard Admin.
+// Deskripsi: Widget kartu statistik institusi kampus pada Dashboard Admin dengan Bento Grid Dinamis.
 
 import 'package:flutter/material.dart';
 
@@ -8,6 +8,7 @@ import '../../../../data/mock/mock_database.dart';
 import '../../../../data/models/ajuan_pengajaran_model.dart';
 import '../../../../data/models/gedung_model.dart';
 import '../../../../data/models/jadwal_model.dart';
+import '../../../../data/models/mata_kuliah_model.dart';
 import '../../../../data/models/ruangan_model.dart';
 import '../../../../data/models/user_model.dart';
 
@@ -16,6 +17,7 @@ class AdminStatCards extends StatelessWidget {
   final List<RuanganModel> ruanganList;
   final List<UserModel> allUsersList;
   final List<dynamic> allMatkulList;
+  final List<Map<String, dynamic>> fakultasList;
   final List<AjuanPengajaranModel> allAjuanList;
   final List<JadwalModel> jadwalList;
 
@@ -25,136 +27,122 @@ class AdminStatCards extends StatelessWidget {
     required this.ruanganList,
     required this.allUsersList,
     this.allMatkulList = const [],
+    this.fakultasList = const [],
     this.allAjuanList = const [],
     this.jadwalList = const [],
   });
 
   @override
   Widget build(BuildContext context) {
-    final dosenPengajarCount = allUsersList
+    // 1. Hitung Dosen Aktif (Filter deleted user IDs, names, and emails)
+    final effectiveUsersList = allUsersList.where((u) =>
+        !MockDatabase.deletedUserIds.contains(u.id) &&
+        !MockDatabase.deletedUserIds.contains(u.nama) &&
+        !MockDatabase.deletedUserIds.contains(u.email)).toList();
+
+    final dosenPengajarCount = effectiveUsersList
         .where((u) => u.role == 'dosen' || u.role == 'kajur' || u.role == 'dekan')
         .length;
     final totalDosenCount = dosenPengajarCount;
 
-    final totalGedungCount = gedungList.length;
-    final totalRuanganCount = ruanganList.length;
+    // 2. Hitung Ruangan Aktif (Filter deleted room & building IDs)
+    final effectiveRuanganList = ruanganList
+        .where((r) =>
+            !MockDatabase.deletedRuanganIds.contains(r.id) &&
+            !MockDatabase.deletedRuanganIds.contains(r.nama) &&
+            (r.gedungId.isEmpty || !MockDatabase.deletedGedungIds.contains(r.gedungId)) &&
+            (r.gedungNama.isEmpty || !MockDatabase.deletedGedungIds.contains(r.gedungNama)))
+        .toList();
 
-    final fakultasSet = <String>{};
+    final totalRuanganCount = effectiveRuanganList.length;
+
+    // 3. Hitung Fakultas & Program Studi Aktif
+    final effectiveFakultasList = fakultasList
+        .where((f) {
+          final id = f['id']?.toString() ?? '';
+          final nama = f['nama']?.toString() ?? '';
+          return !MockDatabase.deletedFakultasIds.contains(id) &&
+              !MockDatabase.deletedFakultasIds.contains(nama);
+        })
+        .toList();
+
+    final totalFakultasCount = effectiveFakultasList.length;
+
     final prodiSet = <String>{};
-    for (final u in allUsersList) {
-      if (u.fakultasNama.isNotEmpty) fakultasSet.add(u.fakultasNama);
-      if (u.jurusanNama.isNotEmpty) prodiSet.add(u.jurusanNama);
+    for (final f in effectiveFakultasList) {
+      final jurRaw = f['jurusan'];
+      if (jurRaw is List) {
+        for (final item in jurRaw) {
+          final str = item.toString().trim();
+          if (str.isNotEmpty && str != 'Semua' && str != 'GLOBAL') {
+            prodiSet.add(str.toLowerCase());
+          }
+        }
+      } else if (jurRaw is String) {
+        for (final item in jurRaw.split(',')) {
+          final str = item.trim();
+          if (str.isNotEmpty && str != 'Semua' && str != 'GLOBAL') {
+            prodiSet.add(str.toLowerCase());
+          }
+        }
+      }
     }
-
-    final totalFakultasCount = fakultasSet.length;
     final totalProdiCount = prodiSet.length;
-    final totalMatkulCount = allMatkulList.length;
 
-    // Kumpulkan seluruh nama ruangan yang telah dialokasikan / terjadwal
+    // 4. Hitung Mata Kuliah Aktif
+    final effectiveMatkulList = allMatkulList.where((m) {
+      final id = (m is Map ? (m['id'] ?? m['kode']) : (m is MataKuliahModel ? m.id : ''))?.toString() ?? '';
+      final nama = (m is Map ? m['nama'] : (m is MataKuliahModel ? m.nama : ''))?.toString() ?? '';
+      return !MockDatabase.deletedMatkulIds.contains(id) &&
+          !MockDatabase.deletedMatkulIds.contains(nama);
+    }).toList();
+
+    final totalMatkulCount = effectiveMatkulList.length;
+
+    // 5. Kumpulkan seluruh nama ruangan yang telah dialokasikan / terjadwal
     final usedRoomNames = <String>{};
     for (final j in jadwalList) {
-      if (j.ruanganNama.trim().isNotEmpty) usedRoomNames.add(j.ruanganNama.trim().toLowerCase());
-    }
-    for (final j in MockDatabase.jadwalFinal) {
-      if (j.ruanganNama.trim().isNotEmpty) usedRoomNames.add(j.ruanganNama.trim().toLowerCase());
-    }
-    for (final j in MockDatabase.jadwalGlobalMaster) {
-      if (j.ruanganNama.trim().isNotEmpty) usedRoomNames.add(j.ruanganNama.trim().toLowerCase());
+      if (!MockDatabase.deletedJadwalIds.contains(j.id) &&
+          !MockDatabase.deletedMatkulIds.contains(j.mataKuliahId) &&
+          !MockDatabase.deletedMatkulIds.contains(j.mataKuliahNama) &&
+          j.ruanganNama.trim().isNotEmpty) {
+        usedRoomNames.add(j.ruanganNama.trim().toLowerCase());
+      }
     }
     for (final a in allAjuanList) {
-      if ((a.status == 'disetujui_admin' || a.status == 'banding_disetujui' || a.status == 'diverifikasi_kaprodi' || a.status == 'disetujui_dekan') &&
+      if (!MockDatabase.deletedAjuanIds.contains(a.id) &&
+          !MockDatabase.deletedMatkulIds.contains(a.mataKuliahId) &&
+          !MockDatabase.deletedMatkulIds.contains(a.mataKuliahNama) &&
+          (a.status == 'disetujui_admin' || a.status == 'banding_disetujui') &&
           a.ruanganNama.trim().isNotEmpty) {
         usedRoomNames.add(a.ruanganNama.trim().toLowerCase());
       }
     }
 
     int countTerpakai = 0;
-    for (final r in ruanganList) {
+    for (final r in effectiveRuanganList) {
       final rLower = r.nama.trim().toLowerCase();
-      if (usedRoomNames.any((u) => u == rLower || u.contains(rLower) || rLower.contains(u))) {
+      final rId = r.id.trim().toLowerCase();
+      if (usedRoomNames.any((u) =>
+          u == rLower ||
+          u == rId ||
+          (u.isNotEmpty && (u.contains(rLower) || rLower.contains(u))))) {
         countTerpakai++;
       }
     }
-    if (countTerpakai == 0 && usedRoomNames.isNotEmpty) {
-      countTerpakai = usedRoomNames.length;
-    }
-    if (totalRuanganCount > 0 && countTerpakai > totalRuanganCount) {
+    if (countTerpakai > totalRuanganCount) {
       countTerpakai = totalRuanganCount;
     }
 
-    final ruanganTerpakaiCount = totalRuanganCount == 0 ? 0 : countTerpakai;
-    final ruanganKosongCount = totalRuanganCount == 0
-        ? 0
-        : (totalRuanganCount >= ruanganTerpakaiCount
-            ? totalRuanganCount - ruanganTerpakaiCount
-            : 0);
+    final ruanganTerpakaiCount = countTerpakai;
+    final ruanganKosongCount = totalRuanganCount >= ruanganTerpakaiCount
+        ? totalRuanganCount - ruanganTerpakaiCount
+        : 0;
 
-    final stats = [
-      {
-        'title': 'Fakultas',
-        'value': '$totalFakultasCount Fakultas',
-        'subtitle': 'Fakultas Aktif',
-        'icon': Icons.account_balance_outlined,
-        'color': AppColors.primary,
-        'bg': const Color(0xFFF0FDFA),
-      },
-      {
-        'title': 'Program Studi',
-        'value': '$totalProdiCount Prodi',
-        'subtitle': 'Jurusan Terdaftar',
-        'icon': Icons.account_tree_outlined,
-        'color': AppColors.primary,
-        'bg': const Color(0xFFF0FDFA),
-      },
-      {
-        'title': 'Gedung Kampus',
-        'value': '$totalGedungCount Gedung',
-        'subtitle': 'Gedung & Lab',
-        'icon': Icons.apartment_rounded,
-        'color': AppColors.primary,
-        'bg': const Color(0xFFF0FDFA),
-      },
-      {
-        'title': 'Total Ruangan & Kelas',
-        'value': '$totalRuanganCount Ruang',
-        'subtitle': 'Kelas Teori & Lab',
-        'icon': Icons.door_sliding_outlined,
-        'color': AppColors.primary,
-        'bg': const Color(0xFFF0FDFA),
-      },
-      {
-        'title': 'Ruangan Kosong',
-        'value': '$ruanganKosongCount Ruang',
-        'subtitle': 'Siap Digunakan',
-        'icon': Icons.meeting_room_outlined,
-        'color': AppColors.primary,
-        'bg': const Color(0xFFF0FDFA),
-      },
-      {
-        'title': 'Ruangan Terpakai',
-        'value': '$ruanganTerpakaiCount Ruang',
-        'subtitle': 'Sesi Perkuliahan',
-        'icon': Icons.event_seat_outlined,
-        'color': AppColors.primary,
-        'bg': const Color(0xFFF0FDFA),
-      },
-      {
-        'title': 'Mata Kuliah',
-        'value': '$totalMatkulCount Matkul',
-        'subtitle': 'Total Matkul Kampus',
-        'icon': Icons.menu_book_rounded,
-        'color': AppColors.primary,
-        'bg': const Color(0xFFF0FDFA),
-      },
-      {
-        'title': 'Dosen Pengajar',
-        'value': '$totalDosenCount Dosen',
-        'subtitle': 'Dosen, Kaprodi, Dekan',
-        'icon': Icons.people_alt_outlined,
-        'color': AppColors.primary,
-        'bg': const Color(0xFFF0FDFA),
-      },
-    ];
+    final double ratioKosong =
+        totalRuanganCount > 0 ? (ruanganKosongCount / totalRuanganCount) : 1.0;
+    final double ratioTerpakai =
+        totalRuanganCount > 0 ? (ruanganTerpakaiCount / totalRuanganCount) : 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,104 +150,260 @@ class AdminStatCards extends StatelessWidget {
         const Text(
           'Statistik Institusi',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
+            letterSpacing: -0.2,
           ),
         ),
         const SizedBox(height: 10),
-        Column(
-          children: stats.map((item) {
-            final color = item['color'] as Color;
-            final bg = item['bg'] as Color;
 
-            return Container(
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x04000000),
-                    blurRadius: 3,
-                    offset: Offset(0, 1),
-                  ),
-                ],
+        // ── 1. Hero Card: Ketersediaan Ruangan (Clean White Card with Line Comparison Bar) ──
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x05000000),
+                blurRadius: 4,
+                offset: Offset(0, 2),
               ),
-              child: Row(
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Ketersediaan Ruangan',
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.1,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Baris Perbandingan Garis (Visual Comparison Bar)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: SizedBox(
+                  height: 6,
+                  child: totalRuanganCount == 0
+                      ? Container(color: const Color(0xFFE2E8F0))
+                      : Row(
+                          children: [
+                            if (ruanganKosongCount > 0)
+                              Expanded(
+                                flex: (ratioKosong * 100).round().clamp(1, 100),
+                                child: Container(color: AppColors.primary),
+                              ),
+                            if (ruanganKosongCount > 0 && ruanganTerpakaiCount > 0)
+                              const SizedBox(width: 2),
+                            if (ruanganTerpakaiCount > 0)
+                              Expanded(
+                                flex: (ratioTerpakai * 100).round().clamp(1, 100),
+                                child: Container(color: const Color(0xFF94A3B8)),
+                              ),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Keterangan Jumlah Kosong vs Terpakai
+              Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: bg,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      item['icon'] as IconData,
-                      color: color,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          item['title'] as String,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Ruangan Kosong',
+                              style: TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 1),
+                        const SizedBox(height: 3),
                         Text(
-                          item['subtitle'] as String,
+                          '$ruanganKosongCount Ruang',
                           style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF64748B),
+                            color: Color(0xFF0F172A),
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
                   Container(
-                    width: 105,
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: bg,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: color.withValues(alpha: 0.25)),
-                    ),
-                    child: Text(
-                      item['value'] as String,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: color,
-                      ),
+                    width: 1,
+                    height: 28,
+                    color: const Color(0xFFE2E8F0),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF94A3B8),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Ruangan Terpakai',
+                              style: TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '$ruanganTerpakaiCount Ruang',
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            );
-          }).toList(),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // ── 2. Row 1: 2 White Cards (Fakultas & Program Studi) ──
+        Row(
+          children: [
+            Expanded(
+              child: _buildWhiteBentoCard(
+                title: 'Fakultas',
+                count: '$totalFakultasCount',
+                subtitle: 'Fakultas',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildWhiteBentoCard(
+                title: 'Program Studi',
+                count: '$totalProdiCount',
+                subtitle: 'Program Studi',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // ── 3. Row 2: 2 White Cards (Mata Kuliah & Dosen Pengajar) ──
+        Row(
+          children: [
+            Expanded(
+              child: _buildWhiteBentoCard(
+                title: 'Mata Kuliah',
+                count: '$totalMatkulCount',
+                subtitle: 'Mata Kuliah',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildWhiteBentoCard(
+                title: 'Dosen',
+                count: '$totalDosenCount',
+                subtitle: 'Dosen Pengajar',
+              ),
+            ),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _buildWhiteBentoCard({
+    required String title,
+    required String count,
+    required String subtitle,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF1E293B),
+              fontSize: 12.5,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            count,
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

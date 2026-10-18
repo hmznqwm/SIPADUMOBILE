@@ -36,6 +36,10 @@ class _DosenMatrixCourseSummaryState extends State<DosenMatrixCourseSummary> {
         .toSet()
         .length;
     final totalFakultasCount = mkByFakultas.keys.length;
+    final totalDurasiMenit = viewModel.mataKuliahList.fold<int>(
+      0,
+      (sum, mk) => sum + (mk.isPraktikum ? mk.sks * 90 : mk.sks * 50),
+    );
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
@@ -69,7 +73,7 @@ class _DosenMatrixCourseSummaryState extends State<DosenMatrixCourseSummary> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
-                      Icons.menu_book_rounded,
+                      Icons.school_outlined,
                       color: AppColors.primary,
                       size: 20,
                     ),
@@ -89,10 +93,11 @@ class _DosenMatrixCourseSummaryState extends State<DosenMatrixCourseSummary> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '$totalFakultasCount Fakultas  •  $totalJurusanCount Jurusan  •  ${viewModel.totalRequiredSks} SKS Total',
+                          '$totalFakultasCount Fak • $totalJurusanCount Prodi • ${viewModel.totalRequiredSks} SKS ($totalDurasiMenit Mnt)',
                           style: const TextStyle(
                             fontSize: 12,
                             color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
@@ -149,11 +154,10 @@ class _DosenMatrixCourseSummaryState extends State<DosenMatrixCourseSummary> {
                         return Padding(
                           padding: const EdgeInsets.only(
                             left: 4,
-                            bottom: 8,
+                            bottom: 10,
                           ),
                           child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 '• ${jurEntry.key}',
@@ -163,68 +167,108 @@ class _DosenMatrixCourseSummaryState extends State<DosenMatrixCourseSummary> {
                                   color: AppColors.primary,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 6),
                               ...jurEntry.value.map(
-                                (mk) => Padding(
-                                  padding: const EdgeInsets.only(
-                                    left: 12,
-                                    bottom: 4,
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        '-',
-                                        style: TextStyle(
-                                          color: Color(0xFF94A3B8),
-                                          fontSize: 12,
+                                (mk) {
+                                  final isLab = mk.isPraktikum;
+                                  final durasi = mk.totalDurasiMenit;
+
+                                  return Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 8,
+                                      bottom: 6,
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isLab
+                                            ? const Color(0xFFF0FDF4)
+                                            : const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: isLab
+                                              ? const Color(0xFF86EFAC)
+                                              : const Color(0xFFE2E8F0),
                                         ),
                                       ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: RichText(
-                                          text: TextSpan(
-                                            style: const TextStyle(
-                                              fontSize: 12.5,
-                                              color: Color(0xFF1E293B),
-                                              height: 1.35,
-                                            ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
                                             children: [
-                                              TextSpan(
-                                                text: mk.nama,
-                                                style: const TextStyle(
-                                                  fontWeight:
-                                                      FontWeight.w600,
-                                                ),
-                                              ),
-                                              TextSpan(
-                                                text: '  ${mk.sks} SKS',
-                                                style: const TextStyle(
-                                                  color:
-                                                      AppColors.primary,
-                                                  fontWeight:
-                                                      FontWeight.bold,
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                              TextSpan(
-                                                text:
-                                                    '  •  Kelas: ${mk.kelasNama.join(", ")}',
-                                                style: const TextStyle(
-                                                  color: Color(
-                                                    0xFF64748B,
+                                              Expanded(
+                                                child: Text(
+                                                  mk.nama,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 12.5,
+                                                    color: Color(0xFF0F172A),
                                                   ),
-                                                  fontSize: 11.5,
+                                                ),
+                                              ),
+                                              // Badge Teori vs Praktikum
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: isLab
+                                                      ? const Color(0xFF16A34A)
+                                                          .withValues(alpha: 0.12)
+                                                      : AppColors.primary
+                                                          .withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  isLab
+                                                      ? 'Praktikum (90m/SKS)'
+                                                      : 'Teori (50m/SKS)',
+                                                  style: TextStyle(
+                                                    fontSize: 9.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isLab
+                                                        ? const Color(0xFF15803D)
+                                                        : AppColors.primary,
+                                                  ),
                                                 ),
                                               ),
                                             ],
                                           ),
-                                        ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                '${mk.sks} SKS • $durasi Menit Total',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isLab
+                                                      ? const Color(0xFF15803D)
+                                                      : AppColors.primary,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '•  Kelas: ${mk.kelasNama.join(", ")}',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF64748B),
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                ),
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),

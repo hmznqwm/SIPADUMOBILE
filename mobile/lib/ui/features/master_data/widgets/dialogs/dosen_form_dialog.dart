@@ -8,6 +8,7 @@ import '../../../../../config/constants.dart';
 import '../../../../../data/models/user_model.dart';
 import '../../../../../data/services/api_service.dart';
 import '../master_data_pickers.dart';
+import 'quick_add_master_dialogs.dart';
 
 // ── Dialog Tambah Dosen Baru ──
 void showAddDosenDialog({
@@ -16,14 +17,24 @@ void showAddDosenDialog({
   required List<Map<String, dynamic>> fakultasData,
   required List<Map<String, dynamic>> matkulData,
   required Set<String> priorityDosenIds,
+  UserModel? currentUser,
   required Function(UserModel newDosen, bool isPriority) onAdded,
 }) {
+  final isKaProdi = currentUser?.role == 'kajur';
+  final isDekan = currentUser?.role == 'dekan';
+
   final nidnCtrl = TextEditingController();
   final namaCtrl = TextEditingController();
   final emailCtrl = TextEditingController();
-  String selectedProdi = 'Teknik Informatika';
-  String selectedFakultas = 'Fakultas Sains & Teknologi';
-  String selectedMatkul = 'IF101 - Algoritma & Pemrograman';
+  String selectedProdi = (isKaProdi && currentUser?.jurusanNama.isNotEmpty == true)
+      ? currentUser!.jurusanNama
+      : (fakultasData.isNotEmpty && (fakultasData.first['jurusan'] as List?)?.isNotEmpty == true
+          ? (fakultasData.first['jurusan'] as List).first.toString()
+          : '');
+  String selectedFakultas = (currentUser?.fakultasNama != null && currentUser!.fakultasNama.isNotEmpty && currentUser.fakultasNama != 'Universitas')
+      ? currentUser.fakultasNama
+      : (fakultasData.isNotEmpty ? (fakultasData.first['nama']?.toString() ?? '') : '');
+  String selectedMatkul = '';
   bool isPriority = false;
 
   showModalBottomSheet(
@@ -60,10 +71,10 @@ void showAddDosenDialog({
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF059669), size: 20),
+                      child: const Icon(Icons.person_add_rounded, color: AppColors.primary, size: 20),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -106,46 +117,78 @@ void showAddDosenDialog({
                     prefixIcon: const Icon(Icons.email_rounded, size: 18, color: Color(0xFF64748B)),
                   ),
                 ),
-                const SizedBox(height: 12),
-                buildSearchablePickerField(
-                  label: 'Fakultas Mengajar',
-                  value: selectedFakultas,
-                  placeholder: 'Pilih fakultas...',
-                  icon: Icons.school_rounded,
-                  onTap: () async {
-                    final picked = await showSearchableFakultasPicker(
-                      context: context,
-                      currentSelected: selectedFakultas,
-                    );
-                    if (picked != null) {
-                      setModalState(() => selectedFakultas = picked);
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                buildSearchablePickerField(
-                  label: 'Program Studi',
-                  value: selectedProdi,
-                  placeholder: 'Pilih prodi...',
-                  icon: Icons.domain_verification_rounded,
-                  onTap: () async {
-                    final picked = await showSearchableProdiPicker(
-                      context: context,
-                      fakultasData: fakultasData,
-                      currentSelected: selectedProdi,
-                      selectedFakultas: selectedFakultas,
-                    );
-                    if (picked != null) {
-                      setModalState(() => selectedProdi = picked);
-                    }
-                  },
-                ),
+                if (!isKaProdi && !isDekan) ...[
+                  const SizedBox(height: 12),
+                  buildSearchablePickerField(
+                    label: 'Fakultas Mengajar',
+                    value: selectedFakultas,
+                    placeholder: 'Pilih fakultas...',
+                    icon: Icons.school_rounded,
+                    onTap: () async {
+                      final picked = await showSearchableFakultasPicker(
+                        context: context,
+                        currentSelected: selectedFakultas,
+                      );
+                      if (picked != null) {
+                        setModalState(() => selectedFakultas = picked);
+                      }
+                    },
+                    onAdd: () {
+                      showQuickAddFakultasDialog(
+                        context: context,
+                        onAdded: (newFak) {
+                          setModalState(() {
+                            if (!fakultasData.any((f) => f['nama'] == newFak['nama'])) {
+                              fakultasData.add(newFak);
+                            }
+                            selectedFakultas = newFak['nama']?.toString() ?? '';
+                            final jurList = (newFak['jurusan'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                            if (jurList.isNotEmpty) {
+                              selectedProdi = jurList.first;
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ],
+                if (!isKaProdi) ...[
+                  const SizedBox(height: 12),
+                  buildSearchablePickerField(
+                    label: 'Program Studi',
+                    value: selectedProdi,
+                    placeholder: 'Pilih prodi...',
+                    icon: Icons.domain_verification_rounded,
+                    onTap: () async {
+                      final picked = await showSearchableProdiPicker(
+                        context: context,
+                        fakultasData: fakultasData,
+                        currentSelected: selectedProdi,
+                        selectedFakultas: selectedFakultas,
+                      );
+                      if (picked != null) {
+                        setModalState(() => selectedProdi = picked);
+                      }
+                    },
+                    onAdd: () {
+                      showQuickAddProdiDialog(
+                        context: context,
+                        currentFakultas: selectedFakultas,
+                        onAdded: (newProdi) {
+                          setModalState(() {
+                            selectedProdi = newProdi;
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ],
                 const SizedBox(height: 12),
                 buildSearchablePickerField(
                   label: 'Mata Kuliah',
                   value: selectedMatkul,
                   placeholder: 'Pilih mata kuliah...',
-                  icon: Icons.book_rounded,
+                  icon: Icons.book_outlined,
                   onTap: () async {
                     final picked = await showSearchableMatkulPicker(
                       context: context,
@@ -155,6 +198,21 @@ void showAddDosenDialog({
                     if (picked != null) {
                       setModalState(() => selectedMatkul = picked);
                     }
+                  },
+                  onAdd: () {
+                    showQuickAddMatkulDialog(
+                      context: context,
+                      defaultFakultas: selectedFakultas.isNotEmpty ? selectedFakultas : null,
+                      defaultProdi: selectedProdi.isNotEmpty ? selectedProdi : null,
+                      onAdded: (newMatkul) {
+                        setModalState(() {
+                          if (!matkulData.any((m) => m['kode'] == newMatkul['kode'])) {
+                            matkulData.add(newMatkul);
+                          }
+                          selectedMatkul = newMatkul['nama']?.toString() ?? '';
+                        });
+                      },
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
@@ -183,8 +241,8 @@ void showAddDosenDialog({
                       ),
                       Switch(
                         value: isPriority,
-                        activeThumbColor: const Color(0xFF059669),
-                        activeTrackColor: const Color(0xFFA7F3D0),
+                        activeThumbColor: AppColors.primary,
+                        activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
                         onChanged: (v) => setModalState(() => isPriority = v),
                       ),
                     ],
@@ -209,7 +267,7 @@ void showAddDosenDialog({
                       flex: 2,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF059669),
+                          backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           elevation: 0,
@@ -235,7 +293,7 @@ void showAddDosenDialog({
                             nama: cleanName,
                             email: cleanEmail,
                             role: 'dosen',
-                            jurusanId: 'JUR001',
+                            jurusanId: (currentUser?.jurusanId.isNotEmpty == true) ? currentUser!.jurusanId : '',
                             jurusanNama: selectedProdi,
                             fakultasNama: selectedFakultas,
                             matkulNama: selectedMatkul,
@@ -271,14 +329,22 @@ void showEditDosenDialog({
   required List<Map<String, dynamic>> fakultasData,
   required List<Map<String, dynamic>> matkulData,
   required Set<String> priorityDosenIds,
+  UserModel? currentUser,
   required Function(UserModel updatedDosen, bool isPriority) onSaved,
 }) {
+  final isKaProdi = currentUser?.role == 'kajur';
+  final isDekan = currentUser?.role == 'dekan';
+
   final nidnCtrl = TextEditingController(text: dosen.id);
   final namaCtrl = TextEditingController(text: dosen.nama);
   final emailCtrl = TextEditingController(text: dosen.email);
-  String selectedProdi = dosen.jurusanNama;
-  String selectedFakultas = dosen.fakultasNama;
-  String selectedMatkul = dosen.matkulNama ?? 'IF101 - Algoritma & Pemrograman';
+  String selectedProdi = (isKaProdi && currentUser?.jurusanNama.isNotEmpty == true)
+      ? currentUser!.jurusanNama
+      : dosen.jurusanNama;
+  String selectedFakultas = (currentUser?.fakultasNama != null && currentUser!.fakultasNama.isNotEmpty && currentUser.fakultasNama != 'Universitas')
+      ? currentUser.fakultasNama
+      : dosen.fakultasNama;
+  String selectedMatkul = dosen.matkulNama ?? '';
   bool isPriority = priorityDosenIds.contains(dosen.id);
 
   showModalBottomSheet(
@@ -315,10 +381,10 @@ void showEditDosenDialog({
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF5),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.edit_note_rounded, color: Color(0xFF059669), size: 20),
+                      child: const Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 20),
                     ),
                     const SizedBox(width: 10),
                     const Expanded(
@@ -361,46 +427,78 @@ void showEditDosenDialog({
                     prefixIcon: const Icon(Icons.email_rounded, size: 18, color: Color(0xFF64748B)),
                   ),
                 ),
-                const SizedBox(height: 12),
-                buildSearchablePickerField(
-                  label: 'Fakultas Mengajar',
-                  value: selectedFakultas,
-                  placeholder: 'Pilih fakultas...',
-                  icon: Icons.school_rounded,
-                  onTap: () async {
-                    final picked = await showSearchableFakultasPicker(
-                      context: context,
-                      currentSelected: selectedFakultas,
-                    );
-                    if (picked != null) {
-                      setModalState(() => selectedFakultas = picked);
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                buildSearchablePickerField(
-                  label: 'Program Studi',
-                  value: selectedProdi,
-                  placeholder: 'Pilih prodi...',
-                  icon: Icons.domain_verification_rounded,
-                  onTap: () async {
-                    final picked = await showSearchableProdiPicker(
-                      context: context,
-                      fakultasData: fakultasData,
-                      currentSelected: selectedProdi,
-                      selectedFakultas: selectedFakultas,
-                    );
-                    if (picked != null) {
-                      setModalState(() => selectedProdi = picked);
-                    }
-                  },
-                ),
+                if (!isKaProdi && !isDekan) ...[
+                  const SizedBox(height: 12),
+                  buildSearchablePickerField(
+                    label: 'Fakultas Mengajar',
+                    value: selectedFakultas,
+                    placeholder: 'Pilih fakultas...',
+                    icon: Icons.school_rounded,
+                    onTap: () async {
+                      final picked = await showSearchableFakultasPicker(
+                        context: context,
+                        currentSelected: selectedFakultas,
+                      );
+                      if (picked != null) {
+                        setModalState(() => selectedFakultas = picked);
+                      }
+                    },
+                    onAdd: () {
+                      showQuickAddFakultasDialog(
+                        context: context,
+                        onAdded: (newFak) {
+                          setModalState(() {
+                            if (!fakultasData.any((f) => f['nama'] == newFak['nama'])) {
+                              fakultasData.add(newFak);
+                            }
+                            selectedFakultas = newFak['nama']?.toString() ?? '';
+                            final jurList = (newFak['jurusan'] as List?)?.map((e) => e.toString()).toList() ?? [];
+                            if (jurList.isNotEmpty) {
+                              selectedProdi = jurList.first;
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ],
+                if (!isKaProdi) ...[
+                  const SizedBox(height: 12),
+                  buildSearchablePickerField(
+                    label: 'Program Studi',
+                    value: selectedProdi,
+                    placeholder: 'Pilih prodi...',
+                    icon: Icons.domain_verification_rounded,
+                    onTap: () async {
+                      final picked = await showSearchableProdiPicker(
+                        context: context,
+                        fakultasData: fakultasData,
+                        currentSelected: selectedProdi,
+                        selectedFakultas: selectedFakultas,
+                      );
+                      if (picked != null) {
+                        setModalState(() => selectedProdi = picked);
+                      }
+                    },
+                    onAdd: () {
+                      showQuickAddProdiDialog(
+                        context: context,
+                        currentFakultas: selectedFakultas,
+                        onAdded: (newProdi) {
+                          setModalState(() {
+                            selectedProdi = newProdi;
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ],
                 const SizedBox(height: 12),
                 buildSearchablePickerField(
                   label: 'Mata Kuliah',
                   value: selectedMatkul,
                   placeholder: 'Pilih mata kuliah...',
-                  icon: Icons.book_rounded,
+                  icon: Icons.book_outlined,
                   onTap: () async {
                     final picked = await showSearchableMatkulPicker(
                       context: context,
@@ -410,6 +508,21 @@ void showEditDosenDialog({
                     if (picked != null) {
                       setModalState(() => selectedMatkul = picked);
                     }
+                  },
+                  onAdd: () {
+                    showQuickAddMatkulDialog(
+                      context: context,
+                      defaultFakultas: selectedFakultas.isNotEmpty ? selectedFakultas : null,
+                      defaultProdi: selectedProdi.isNotEmpty ? selectedProdi : null,
+                      onAdded: (newMatkul) {
+                        setModalState(() {
+                          if (!matkulData.any((m) => m['kode'] == newMatkul['kode'])) {
+                            matkulData.add(newMatkul);
+                          }
+                          selectedMatkul = newMatkul['nama']?.toString() ?? '';
+                        });
+                      },
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
@@ -438,8 +551,8 @@ void showEditDosenDialog({
                       ),
                       Switch(
                         value: isPriority,
-                        activeThumbColor: const Color(0xFF059669),
-                        activeTrackColor: const Color(0xFFA7F3D0),
+                        activeThumbColor: AppColors.primary,
+                        activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
                         onChanged: (v) => setModalState(() => isPriority = v),
                       ),
                     ],
@@ -464,7 +577,7 @@ void showEditDosenDialog({
                       flex: 2,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF059669),
+                          backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           elevation: 0,

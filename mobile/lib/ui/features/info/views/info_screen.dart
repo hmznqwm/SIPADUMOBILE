@@ -165,31 +165,22 @@ class InfoScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(AppRadius.lg),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: () => showLogoutConfirmDialog(context),
                     borderRadius: BorderRadius.circular(AppRadius.lg),
-                    splashColor: AppColors.error.withValues(alpha: 0.08),
-                    highlightColor: AppColors.error.withValues(alpha: 0.04),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.logout_rounded,
                           size: 20,
-                          color: AppColors.error,
+                          color: Color(0xFF0F172A),
                         ),
                         SizedBox(width: 8),
                         Text(
@@ -197,7 +188,7 @@ class InfoScreen extends StatelessWidget {
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: AppColors.error,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
                       ],

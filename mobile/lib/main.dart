@@ -42,7 +42,7 @@ void main() {
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
-      systemNavigationBarColor: Colors.white,
+      systemNavigationBarColor: Colors.transparent,
       systemNavigationBarDividerColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.dark,
       systemNavigationBarContrastEnforced: false,
@@ -58,14 +58,16 @@ class SmartScheduleApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. Inisialisasi Service API & Repository (Data Layer)
+    // [PRESENTASI] Inisialisasi Service API & Repository (Data Layer)
+    // Menyiapkan lapisan akses data sebelum aplikasi berjalan penuh
     final apiService = ApiService();
     final authRepo = AuthRepository(apiService: apiService);
     final availabilityRepo = AvailabilityRepository(apiService: apiService);
     final jadwalRepo = JadwalRepository(apiService: apiService);
     final notifRepo = NotificationRepository(apiService: apiService);
 
-    // 2. Mengatur MultiProvider untuk State Management (MVVM Pattern)
+    // [PRESENTASI] Mengatur MultiProvider untuk State Management (MVVM Pattern)
+    // Menginjeksi dependency ViewModels (Business Logic) ke seluruh widget tree
     return MultiProvider(
       providers: [
         // Provider Service API Utama
@@ -109,7 +111,7 @@ class SmartScheduleApp extends StatelessWidget {
           ),
         ),
       ],
-      // 3. Konfigurasi Utama MaterialApp (Tema, Judul, Route & Initial Screen)
+      // [PRESENTASI] Konfigurasi Utama MaterialApp (Tema, Judul, Route & Initial Screen)
       child: MaterialApp(
         title: 'SIPADU - Sistem Informasi Penjadwalan Dosen',
         debugShowCheckedModeBanner: false,
@@ -121,7 +123,9 @@ class SmartScheduleApp extends StatelessWidget {
   }
 }
 
-/// Widget Wrapper untuk Memeriksa Status Login User (Session Check)
+/// [PRESENTASI] Widget Wrapper untuk Memeriksa Status Login User (Session Check)
+/// Mengarahkan user secara cerdas: ke Dashboard (jika login), LoginScreen (jika sesi habis), 
+/// atau OnboardingScreen (jika baru pertama kali instal).
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 

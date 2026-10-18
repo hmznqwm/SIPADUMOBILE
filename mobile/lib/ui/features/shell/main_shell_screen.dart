@@ -104,9 +104,13 @@ class MainShellScreen extends StatefulWidget {
 
 class _MainShellScreenState extends State<MainShellScreen> {
   int _currentIndex = 0;
+  int _masterDataKey = 0;
 
   void _onTabTapped(int index) {
     setState(() {
+      if (index == 2 && _currentIndex != 2) {
+        _masterDataKey++;
+      }
       _currentIndex = index;
     });
   }
@@ -124,6 +128,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
         if (user?.role == 'kajur') return 'Verifikasi Ketersediaan';
         return 'Ketersediaan Jadwal';
       case 2:
+        if (user?.role == 'kajur') return 'Master Data Prodi';
+        if (user?.role == 'dekan') return 'Master Data Fakultas';
         return 'Master Data & Prioritas';
       case 3:
         if (user?.role == 'admin') return 'Jadwal Master Institusi';
@@ -246,7 +252,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     final pages = [
       DashboardScreen(onNavigateToTab: _onTabTapped),
       const AvailabilityScreen(),
-      const AdminMasterDataScreen(),
+      AdminMasterDataScreen(key: ValueKey('master_data_$_masterDataKey')),
       const ScheduleScreen(),
       const ProfileScreen(),
     ];
@@ -257,7 +263,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     final isHistoryVisible = user?.role == 'dosen' && safeIndex == 1;
     final isExportPdfVisible = user?.role != 'admin' && safeIndex == 3;
 
-    final bool isAdmin = user?.role == 'admin';
+    final bool hasMasterDataAccess = user?.role == 'admin' || user?.role == 'dekan' || user?.role == 'kajur';
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -337,7 +343,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         body: IndexedStack(
           index: safeIndex,
           children: pages.map<Widget>((page) {
-            if (page is AdminMasterDataScreen && !isAdmin) {
+            if (page is AdminMasterDataScreen && !hasMasterDataAccess) {
               return const Center(
                 child: Padding(
                   padding: EdgeInsets.all(24),
@@ -352,7 +358,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
                       ),
                       SizedBox(height: 6),
                       Text(
-                        'Menu Master Data & Prioritas Kampus hanya dapat diakses oleh Super Administrator.',
+                        'Menu Master Data hanya dapat diakses oleh Super Administrator, Dekan, atau Ketua Program Studi.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                       ),
@@ -390,7 +396,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     crossAxisAlignment: CrossAxisAlignment.center,
-                    children: isAdmin
+                    children: hasMasterDataAccess
                         ? [
                             _buildNavItem(0, Icons.grid_view_outlined, Icons.grid_view_rounded, 'Dashboard'),
                             _buildNavItem(1, Icons.description_outlined, Icons.description_rounded, 'Ajuan'),

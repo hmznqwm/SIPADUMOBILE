@@ -11,10 +11,17 @@ void showDosenMatrixSubmitConfirmationDialog(
   BuildContext context,
   AvailabilityViewModel viewModel,
 ) {
-  final isUpdate = viewModel.availability != null;
+  final isUpdate = viewModel.availability?.isSubmitted ?? false;
   final totalSlots = viewModel.selectedCount;
-  final taggedSlots = viewModel.slotTags.length;
+  final taggedSlots = viewModel.slotTags.keys
+      .where((id) => viewModel.selectedSlotIds.contains(id))
+      .length;
   final flexibleSlots = totalSlots - taggedSlots;
+  final totalMenit = totalSlots * 50;
+  final durasiLabel = totalMenit >= 60
+      ? '${totalMenit ~/ 60} jam ${totalMenit % 60 > 0 ? '${totalMenit % 60} mnt' : ''}'.trim()
+      : '$totalMenit mnt';
+  final messenger = ScaffoldMessenger.of(context);
 
   showDialog(
     context: context,
@@ -79,7 +86,7 @@ void showDosenMatrixSubmitConfirmationDialog(
                 ConfirmRow(
                   icon: Icons.timer_outlined,
                   label: 'Total Slot Waktu',
-                  value: '$totalSlots Slot (${totalSlots * 2} Jam)',
+                  value: '$totalSlots Slot ($durasiLabel)',
                   valueColor: const Color(0xFF0F172A),
                 ),
                 const Divider(height: 14, color: Color(0xFFE2E8F0)),
@@ -158,7 +165,19 @@ void showDosenMatrixSubmitConfirmationDialog(
               child: ElevatedButton(
                 onPressed: () async {
                   Navigator.pop(ctx);
-                  await viewModel.submitAvailability();
+                  final ok = await viewModel.submitAvailability();
+                  final msg = ok ? viewModel.successMessage : viewModel.errorMessage;
+                  if (msg != null && msg.isNotEmpty) {
+                    messenger
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(msg),
+                          backgroundColor: ok ? AppColors.available : AppColors.error,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,

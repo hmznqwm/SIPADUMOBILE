@@ -10,6 +10,10 @@ import '../../../../data/repositories/auth_repository.dart';
 import '../../../../data/repositories/availability_repository.dart';
 import '../../../../data/repositories/jadwal_repository.dart';
 
+/// [PRESENTASI] DashboardViewModel (Pattern MVVM):
+/// Bertugas sebagai otak dari halaman Dashboard. 
+/// Mengambil, mengolah, dan menyediakan data SKS, Mata Kuliah, 
+/// Status Ketersediaan, dan Jadwal Dosen untuk ditampilkan di View.
 class DashboardViewModel extends ChangeNotifier {
   final AuthRepository _authRepository;
   final AvailabilityRepository _availabilityRepository;
@@ -39,6 +43,9 @@ class DashboardViewModel extends ChangeNotifier {
   int _totalJadwal = 0;
   int get totalJadwal => _totalJadwal;
 
+  /// [PRESENTASI] loadDashboardData():
+  /// Dipanggil saat dashboard pertama kali dibuka. 
+  /// Mengambil data secara asinkron dan sinkronisasi dengan UI menggunakan notifyListeners()
   Future<void> loadDashboardData() async {
     final user = currentUser;
     if (user == null) return;
@@ -52,35 +59,6 @@ class DashboardViewModel extends ChangeNotifier {
 
         if (_mataKuliahList.isEmpty && user.email.isNotEmpty) {
           _mataKuliahList = await _availabilityRepository.getMataKuliah(user.email);
-        }
-
-        // Fallback to user.matkulNama if database table link is pending
-        if (_mataKuliahList.isEmpty && user.matkulNama != null && user.matkulNama!.trim().isNotEmpty) {
-          final parts = user.matkulNama!.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty);
-          int idx = 1;
-          final synthesized = <MataKuliahModel>[];
-          for (final p in parts) {
-            final cleanName = p.contains('-') ? p.split('-').last.trim() : p;
-            synthesized.add(
-              MataKuliahModel(
-                id: 'MK_${user.id}_$idx',
-                nama: cleanName,
-                sks: 3,
-                jurusanId: user.jurusanId.isNotEmpty ? user.jurusanId : 'JUR001',
-                jurusanNama: user.jurusanNama.isNotEmpty ? user.jurusanNama : 'Teknik Informatika',
-                fakultasNama: user.fakultasNama.isNotEmpty ? user.fakultasNama : 'Fakultas Sains & Teknologi',
-                dosenId: user.id,
-                dosenNama: user.nama,
-                semesterId: 'SEM001',
-                kebutuhanTipeRuangan: 'Kelas Teori',
-                kelasNama: const ['Kelas A', 'Kelas B'],
-              ),
-            );
-            idx++;
-          }
-          if (synthesized.isNotEmpty) {
-            _mataKuliahList = synthesized;
-          }
         }
 
         final availability = await _availabilityRepository.getAvailability(user.id, 'SEM001');

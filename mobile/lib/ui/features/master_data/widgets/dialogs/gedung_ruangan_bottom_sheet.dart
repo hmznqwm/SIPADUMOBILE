@@ -67,11 +67,19 @@ class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> 
     final api = context.read<ApiService>();
     final allRooms = await api.getRuanganList();
     if (!mounted) return;
+    final gNamaLower = widget.gedung.nama.trim().toLowerCase();
+    final gIdLower = widget.gedung.id.trim().toLowerCase();
+
     setState(() {
       _ruanganList = allRooms.where((r) {
-        final matchId = r.gedungId.isNotEmpty && (r.gedungId == widget.gedung.id || r.gedungId == widget.gedung.nama);
-        final matchNama = r.gedungNama.isNotEmpty &&
-            r.gedungNama.trim().toLowerCase() == widget.gedung.nama.trim().toLowerCase();
+        final rGedungId = r.gedungId.trim().toLowerCase();
+        final rGedungNama = r.gedungNama.trim().toLowerCase();
+        final matchId = rGedungId.isNotEmpty && (rGedungId == gIdLower || rGedungId == gNamaLower);
+        final matchNama = rGedungNama.isNotEmpty &&
+            (rGedungNama == gNamaLower ||
+             rGedungNama == gIdLower ||
+             gNamaLower.contains(rGedungNama) ||
+             rGedungNama.contains(gNamaLower));
         return matchId || matchNama;
       }).toList();
       _isLoading = false;
@@ -81,6 +89,7 @@ class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> 
   void _openAddRuanganDialog() {
     final namaCtrl = TextEditingController();
     final kapasitasCtrl = TextEditingController(text: '40');
+    final keteranganCtrl = TextEditingController(text: 'Ruang kelas ber-AC dan LCD proyektor');
     String selectedTipe = 'Kelas Teori';
     final formKey = GlobalKey<FormState>();
 
@@ -92,6 +101,7 @@ class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> 
             if (!formKey.currentState!.validate()) return;
             final rName = namaCtrl.text.trim();
             final rCap = int.tryParse(kapasitasCtrl.text.trim()) ?? 40;
+            final rKet = keteranganCtrl.text.trim();
             final newRoom = RuanganModel(
               id: 'RNG_${DateTime.now().millisecondsSinceEpoch}',
               nama: rName,
@@ -99,6 +109,7 @@ class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> 
               gedungNama: widget.gedung.nama,
               kapasitas: rCap,
               tipeRuangan: selectedTipe,
+              keterangan: rKet.isNotEmpty ? rKet : 'Ruang kelas ber-AC dan LCD proyektor',
             );
             Navigator.pop(dCtx);
 
@@ -180,6 +191,7 @@ class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> 
                           flex: 3,
                           child: DropdownButtonFormField<String>(
                             initialValue: selectedTipe,
+                            icon: const SizedBox.shrink(),
                             decoration: InputDecoration(
                               labelText: 'Tipe Ruangan',
                               filled: true,
@@ -204,8 +216,7 @@ class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> 
                           child: TextFormField(
                             controller: kapasitasCtrl,
                             keyboardType: TextInputType.number,
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted: (_) => submitForm(),
+                            textInputAction: TextInputAction.next,
                             decoration: InputDecoration(
                               labelText: 'Kapasitas',
                               filled: true,
@@ -220,6 +231,24 @@ class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> 
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: keteranganCtrl,
+                      textInputAction: TextInputAction.done,
+                      maxLines: 2,
+                      onFieldSubmitted: (_) => submitForm(),
+                      decoration: InputDecoration(
+                        labelText: 'Keterangan / Fasilitas',
+                        hintText: 'Misal: Ruang kelas ber-AC dan LCD proyektor',
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Row(
@@ -539,6 +568,18 @@ class _GedungRuanganSheetContentState extends State<_GedungRuanganSheetContent> 
                                       color: Color(0xFF64748B),
                                     ),
                                   ),
+                                  if (r.keterangan.trim().isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      r.keterangan,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF94A3B8),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),

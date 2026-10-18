@@ -7,6 +7,7 @@
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -62,7 +63,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     super.initState();
     _floatController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4000),
+      duration: const Duration(milliseconds: 7500),
     )..repeat();
   }
 
@@ -111,9 +112,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final size = MediaQuery.of(context).size;
     final isLastPage = _currentPage == _slides.length - 1;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Color(0xFFF8FAFC), // Sesuaikan dengan warna background (mencegah black bar di strip navigasi)
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: SafeArea(
         child: Column(
           children: [
             const SizedBox(height: 12),
@@ -227,6 +238,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -243,7 +255,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             animation: _floatController,
             builder: (context, child) {
               final floatOffset =
-                  math.sin(_floatController.value * 2 * math.pi) * 6;
+                  math.sin(_floatController.value * 2 * math.pi) * 5;
 
               return Transform.translate(
                 offset: Offset(0, floatOffset),

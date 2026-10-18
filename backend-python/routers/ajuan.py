@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -52,7 +56,7 @@ def delete_ajuan_from_supabase(aid: str):
     try:
         safe_id = sanitize_supabase_param(aid)
         url = f"{SUPABASE_URL}/rest/v1/ajuan_pengajaran?id=eq.{safe_id}"
-        requests.delete(url, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, timeout=5)
+        requests.delete(url, headers=SB_HEADERS, timeout=6)
     except Exception as e:
         logger.warning(f"Failed to delete ajuan from Supabase: {e}")
 
@@ -206,45 +210,118 @@ def get_ajuan(
 
     return {"status": "success", "data": [format_ajuan(a) for a in items]}
 
+@router.post("")
+@router.post("/")
+@router.post("/index.php")
 @router.post("/submit")
 @router.post("/submit.php")
-async def submit_ajuan(request: Request, db: Session = Depends(get_db)):
+async def submit_or_create_ajuan(request: Request, db: Session = Depends(get_db)):
+    """
+    [PRESENTASI] Pengajuan Jadwal oleh Dosen / Tambah Ajuan:
+    Mendukung pembuatan draf ajuan baru, pembaruan ajuan yang sudah ada, 
+    atau penghapusan jika action == 'delete'.
+    """
     body = await request.json()
+    action = str(body.get("action", "")).lower()
+
+    if action == "delete":
+        aid = body.get("id") or body.get("ajuan_id") or body.get("ajuanId")
+        if aid:
+            safe_id = sanitize_supabase_param(aid)
+            db.query(JadwalFinal).filter((JadwalFinal.id == aid) | (JadwalFinal.id == f"JDW_{aid}")).delete(synchronize_session=False)
+            db.query(AjuanPengajaran).filter(AjuanPengajaran.id == aid).delete(synchronize_session=False)
+            db.commit()
+            delete_ajuan_from_supabase(safe_id)
+            try:
+                requests.delete(f"{SUPABASE_URL}/rest/v1/jadwal_final?or=(id.eq.{safe_id},id.eq.JDW_{safe_id})", headers=SB_HEADERS, timeout=5)
+            except Exception:
+                pass
+            return {"status": "success", "message": "Ajuan pengajaran berhasil dihapus"}
+
     did = body.get("dosen_id") or body.get("dosenId")
     mk_id = body.get("mata_kuliah_id") or body.get("mataKuliahId")
     if not did or not mk_id:
         raise HTTPException(status_code=400, detail={"status": "error", "message": "Dosen dan Mata Kuliah wajib diisi."})
 
-    aid = f"AJU_{secrets.token_hex(4).upper()}"
-    ajuan = AjuanPengajaran(
-        id=aid,
-        dosen_id=did,
-        dosen_nama=body.get("dosen_nama") or body.get("dosenNama", "Dosen Pengampu"),
-        fakultas_nama=body.get("fakultas_nama") or body.get("fakultasNama", "Fakultas Sains & Teknologi"),
-        jurusan_nama=body.get("jurusan_nama") or body.get("jurusanNama") or body.get("prodi", "Teknik Informatika"),
-        mata_kuliah_id=mk_id,
-        mata_kuliah_nama=body.get("mata_kuliah_nama") or body.get("mataKuliahNama", "Mata Kuliah"),
-        sks=int(body.get("sks", 3)),
-        semester=int(body.get("semester", 1)),
-        kelas_nama=body.get("kelas_nama") or body.get("kelasNama", "TI-1A"),
-        jumlah_mahasiswa=int(body.get("jumlah_mahasiswa") or body.get("jumlahMahasiswa", 35)),
-        gedung_nama=body.get("gedung_nama") or body.get("gedungNama", "Gedung FST Terpadu"),
-        ruangan_nama=body.get("ruangan_nama") or body.get("ruanganNama", "Ruang FST 101"),
-        hari=body.get("hari", "Senin"),
-        jam_mulai=body.get("jam_mulai") or body.get("jamMulai", "07:30"),
-        jam_selesai=body.get("jam_selesai") or body.get("jamSelesai", "10:00"),
-        status="menunggu_kaprodi",
-        catatan_dosen=body.get("catatan_dosen") or body.get("catatanDosen", "")
-    )
-    db.add(ajuan)
+    aid = body.get("id") or body.get("ajuan_id") or body.get("ajuanId") or f"AJU_{secrets.token_hex(4).upper()}"
+    existing = db.query(AjuanPengajaran).filter(AjuanPengajaran.id == aid).first()
+
+    if existing:
+        existing.dosen_id = did
+        existing.dosen_nama = body.get("dosen_nama") or body.get("dosenNama") or existing.dosen_nama
+        existing.fakultas_nama = body.get("fakultas_nama") or body.get("fakultasNama") or existing.fakultas_nama
+        existing.jurusan_nama = body.get("jurusan_nama") or body.get("jurusanNama") or body.get("prodi") or existing.jurusan_nama
+        existing.mata_kuliah_id = mk_id
+        existing.mata_kuliah_nama = body.get("mata_kuliah_nama") or body.get("mataKuliahNama") or existing.mata_kuliah_nama
+        existing.sks = int(body.get("sks", existing.sks))
+        existing.semester = int(body.get("semester", existing.semester))
+        existing.kelas_nama = body.get("kelas_nama") or body.get("kelasNama") or existing.kelas_nama
+        existing.jumlah_mahasiswa = int(body.get("jumlah_mahasiswa") or body.get("jumlahMahasiswa") or existing.jumlah_mahasiswa)
+        existing.gedung_nama = body.get("gedung_nama") or body.get("gedungNama") or existing.gedung_nama
+        existing.ruangan_nama = body.get("ruangan_nama") or body.get("ruanganNama") or existing.ruangan_nama
+        existing.hari = body.get("hari") or existing.hari
+        existing.jam_mulai = body.get("jam_mulai") or body.get("jamMulai") or existing.jam_mulai
+        existing.jam_selesai = body.get("jam_selesai") or body.get("jamSelesai") or existing.jam_selesai
+        existing.status = body.get("status") or existing.status
+        existing.catatan_dosen = body.get("catatan_dosen") or body.get("catatanDosen") or existing.catatan_dosen
+        existing.catatan_kaprodi = body.get("catatan_kaprodi") or body.get("catatanKaprodi") or existing.catatan_kaprodi
+        existing.catatan_dekan = body.get("catatan_dekan") or body.get("catatanDekan") or existing.catatan_dekan
+        existing.catatan_admin = body.get("catatan_admin") or body.get("catatanAdmin") or existing.catatan_admin
+        existing.alasan_penolakan = body.get("alasan_penolakan") or body.get("alasanPenolakan") or existing.alasan_penolakan
+        existing.bentrok_detail = body.get("bentrok_detail") or body.get("bentrokDetail") or existing.bentrok_detail
+        ajuan = existing
+    else:
+        ajuan = AjuanPengajaran(
+            id=aid,
+            dosen_id=did,
+            dosen_nama=body.get("dosen_nama") or body.get("dosenNama", "Dosen Pengampu"),
+            fakultas_nama=body.get("fakultas_nama") or body.get("fakultasNama", ""),
+            jurusan_nama=body.get("jurusan_nama") or body.get("jurusanNama") or body.get("prodi", ""),
+            mata_kuliah_id=mk_id,
+            mata_kuliah_nama=body.get("mata_kuliah_nama") or body.get("mataKuliahNama", "Mata Kuliah"),
+            sks=int(body.get("sks", 3)),
+            semester=int(body.get("semester", 1)),
+            kelas_nama=body.get("kelas_nama") or body.get("kelasNama", "TI-1A"),
+            jumlah_mahasiswa=int(body.get("jumlah_mahasiswa") or body.get("jumlahMahasiswa", 35)),
+            gedung_nama=body.get("gedung_nama") or body.get("gedungNama", "Gedung FST Terpadu"),
+            ruangan_nama=body.get("ruangan_nama") or body.get("ruanganNama", "Ruang FST 101"),
+            hari=body.get("hari", "Senin"),
+            jam_mulai=body.get("jam_mulai") or body.get("jamMulai", "07:30"),
+            jam_selesai=body.get("jam_selesai") or body.get("jamSelesai", "10:00"),
+            status=body.get("status", "menunggu_kaprodi"),
+            catatan_dosen=body.get("catatan_dosen") or body.get("catatanDosen", ""),
+            catatan_kaprodi=body.get("catatan_kaprodi") or body.get("catatanKaprodi", ""),
+            catatan_dekan=body.get("catatan_dekan") or body.get("catatanDekan", ""),
+            catatan_admin=body.get("catatan_admin") or body.get("catatanAdmin", ""),
+            alasan_penolakan=body.get("alasan_penolakan") or body.get("alasanPenolakan", ""),
+            bentrok_detail=body.get("bentrok_detail") or body.get("bentrokDetail", "")
+        )
+        db.add(ajuan)
+
     db.commit()
     sync_ajuan_to_supabase(ajuan)
-    return {"status": "success", "message": "Ajuan pengajaran berhasil dikirim ke KaProdi.", "data": format_ajuan(ajuan)}
+    return {"status": "success", "message": "Ajuan pengajaran berhasil disimpan.", "data": format_ajuan(ajuan)}
+
+@router.put("")
+@router.put("/")
+@router.put("/index.php")
+async def update_ajuan_endpoint(request: Request, db: Session = Depends(get_db)):
+    """
+    [PRESENTASI] Update Ajuan Pengajaran
+    """
+    return await submit_or_create_ajuan(request, db)
 
 # ─── VERIFIKASI MULTI-TIER (KAPRODI, DEKAN, ADMIN) ─────────────────────
 @router.post("/verify")
 @router.post("/verify.php")
 async def verify_ajuan_endpoint(request: Request, db: Session = Depends(get_db)):
+    """
+    [PRESENTASI] Sistem Verifikasi Berjenjang (Workflow Approval):
+    Mengatur alur persetujuan jadwal:
+    1. Kaprodi: Menyetujui/Menolak dari segi substansi akademik.
+    2. Dekan: Persetujuan akhir dari fakultas.
+    3. Admin/RCK: Verifikasi final, eksekusi masuk ke 'Jadwal Final', atau resolve manual saat ada bentrok.
+    """
     body = await request.json()
     action = (body.get("action") or "").strip().lower()
     aid = body.get("id") or body.get("ajuan_id") or body.get("ajuanId")
@@ -268,7 +345,9 @@ async def verify_ajuan_endpoint(request: Request, db: Session = Depends(get_db))
         ajuan.jam_selesai = updated_data.get("jamSelesai") or updated_data.get("jam_selesai") or ajuan.jam_selesai
 
     if action in ["verify_kaprodi", "kaprodi_verify"]:
-        ajuan.status = "diverifikasi_kaprodi"
+        # [PRESENTASI] Tahap 1: Disetujui Kaprodi, lanjut ke Dekan
+        ajuan.status = "menunggu_dekan"
+        ajuan.bentrok_detail = None
         if catatan:
             ajuan.catatan_kaprodi = catatan
         db.commit()
@@ -276,76 +355,93 @@ async def verify_ajuan_endpoint(request: Request, db: Session = Depends(get_db))
         return {"status": "success", "message": "Ajuan berhasil diverifikasi oleh KaProdi.", "data": format_ajuan(ajuan)}
 
     elif action in ["approve_dekan", "dekan_approve"]:
-        ajuan.status = "disetujui_dekan"
+        # [PRESENTASI] Tahap 2: Disetujui Dekan, siap direview Admin / Masuk CSP Engine
+        ajuan.status = "menunggu_admin"
+        ajuan.bentrok_detail = None
         if catatan:
             ajuan.catatan_dekan = catatan
-        
-        # Insert into Jadwal Final
-        jadwal = JadwalFinal(
-            id=f"SCH_{secrets.token_hex(4).upper()}",
-            mata_kuliah_id=ajuan.mata_kuliah_id,
-            mata_kuliah_nama=ajuan.mata_kuliah_nama,
-            sks=ajuan.sks,
-            ruangan_nama=ajuan.ruangan_nama,
-            gedung_nama=ajuan.gedung_nama,
-            kelas_nama=ajuan.kelas_nama,
-            hari=ajuan.hari,
-            jam_mulai=ajuan.jam_mulai,
-            jam_selesai=ajuan.jam_selesai,
-            dosen_id=ajuan.dosen_id,
-            dosen_nama=ajuan.dosen_nama,
-            fakultas_nama=ajuan.fakultas_nama,
-            jurusan_nama=ajuan.jurusan_nama,
-            jumlah_mahasiswa=ajuan.jumlah_mahasiswa
-        )
-        db.add(jadwal)
         db.commit()
         sync_ajuan_to_supabase(ajuan)
-        sync_jadwal_to_supabase(jadwal)
-        return {"status": "success", "message": "Ajuan disetujui Dekan dan dimasukkan ke Jadwal Final.", "data": format_ajuan(ajuan)}
+        return {"status": "success", "message": "Ajuan disetujui Dekan dan diteruskan ke Admin.", "data": format_ajuan(ajuan)}
 
-    elif action in ["reject_kaprodi", "reject_dekan", "reject"]:
-        ajuan.status = "ditolak"
+    elif action in ["reject_kaprodi", "kaprodi_reject", "reject_dekan", "dekan_reject", "admin_reject", "reject_admin", "reject"]:
+        if "kaprodi" in action:
+            ajuan.status = "ditolak_kaprodi"
+        elif "dekan" in action:
+            ajuan.status = "ditolak_dekan"
+        elif "admin" in action:
+            ajuan.status = "ditolak_admin"
+        else:
+            ajuan.status = "ditolak"
         if alasan:
             ajuan.alasan_penolakan = alasan
         db.commit()
         sync_ajuan_to_supabase(ajuan)
         return {"status": "success", "message": "Ajuan telah ditolak.", "data": format_ajuan(ajuan)}
 
-    elif action in ["admin_resolve", "resolve"]:
-        ajuan.status = "disetujui_dekan"
+    elif action in ["admin_approve", "admin_final_approve", "admin_resolve", "resolve", "batch_resolve"]:
+        # [PRESENTASI] Tahap Akhir: Disetujui Admin
+        # Memindahkan status ajuan menjadi "disetujui_admin" dan menyalin datanya ke tabel 'JadwalFinal'
+        ajuan.status = "disetujui_admin"
+        ajuan.bentrok_detail = None
         if catatan:
             ajuan.catatan_admin = catatan
-        jadwal = JadwalFinal(
-            id=f"SCH_{secrets.token_hex(4).upper()}",
-            mata_kuliah_id=ajuan.mata_kuliah_id,
-            mata_kuliah_nama=ajuan.mata_kuliah_nama,
-            sks=ajuan.sks,
-            ruangan_nama=ajuan.ruangan_nama,
-            gedung_nama=ajuan.gedung_nama,
-            kelas_nama=ajuan.kelas_nama,
-            hari=ajuan.hari,
-            jam_mulai=ajuan.jam_mulai,
-            jam_selesai=ajuan.jam_selesai,
-            dosen_id=ajuan.dosen_id,
-            dosen_nama=ajuan.dosen_nama,
-            fakultas_nama=ajuan.fakultas_nama,
-            jurusan_nama=ajuan.jurusan_nama,
-            jumlah_mahasiswa=ajuan.jumlah_mahasiswa
-        )
-        db.add(jadwal)
+        
+        j_id = f"JDW_{ajuan.id}"
+        exist_j = db.query(JadwalFinal).filter((JadwalFinal.id == j_id) | ((JadwalFinal.mata_kuliah_nama == ajuan.mata_kuliah_nama) & (JadwalFinal.kelas_nama == ajuan.kelas_nama))).first()
+        if exist_j:
+            exist_j.mata_kuliah_id = ajuan.mata_kuliah_id
+            exist_j.mata_kuliah_nama = ajuan.mata_kuliah_nama
+            exist_j.sks = ajuan.sks
+            exist_j.ruangan_nama = ajuan.ruangan_nama
+            exist_j.gedung_nama = ajuan.gedung_nama
+            exist_j.kelas_nama = ajuan.kelas_nama
+            exist_j.hari = ajuan.hari
+            exist_j.jam_mulai = ajuan.jam_mulai
+            exist_j.jam_selesai = ajuan.jam_selesai
+            exist_j.dosen_id = ajuan.dosen_id
+            exist_j.dosen_nama = ajuan.dosen_nama
+            exist_j.fakultas_nama = ajuan.fakultas_nama
+            exist_j.jurusan_nama = ajuan.jurusan_nama
+            exist_j.jumlah_mahasiswa = ajuan.jumlah_mahasiswa
+            jadwal = exist_j
+        else:
+            jadwal = JadwalFinal(
+                id=j_id,
+                mata_kuliah_id=ajuan.mata_kuliah_id,
+                mata_kuliah_nama=ajuan.mata_kuliah_nama,
+                sks=ajuan.sks,
+                ruangan_nama=ajuan.ruangan_nama,
+                gedung_nama=ajuan.gedung_nama,
+                kelas_nama=ajuan.kelas_nama,
+                hari=ajuan.hari,
+                jam_mulai=ajuan.jam_mulai,
+                jam_selesai=ajuan.jam_selesai,
+                dosen_id=ajuan.dosen_id,
+                dosen_nama=ajuan.dosen_nama,
+                fakultas_nama=ajuan.fakultas_nama,
+                jurusan_nama=ajuan.jurusan_nama,
+                jumlah_mahasiswa=ajuan.jumlah_mahasiswa
+            )
+            db.add(jadwal)
         db.commit()
         sync_ajuan_to_supabase(ajuan)
         sync_jadwal_to_supabase(jadwal)
-        return {"status": "success", "message": "Ajuan berhasil diselesaikan oleh Admin.", "data": format_ajuan(ajuan)}
+        return {"status": "success", "message": "Ajuan berhasil disetujui Admin dan dicatat ke Jadwal Final.", "data": format_ajuan(ajuan)}
 
     db.commit()
+    sync_ajuan_to_supabase(ajuan)
     return {"status": "success", "data": format_ajuan(ajuan)}
 
 # ─── BANDING JADWAL ───────────────────────────────────────────────────
 @router.post("/banding")
 @router.post("/banding.php")
 async def handle_banding(request: Request, db: Session = Depends(get_db)):
+    """
+    [PRESENTASI] Fitur Banding / Rescheduling:
+    Jika jadwal dari CSP Engine atau Admin dirasa kurang cocok, dosen dapat
+    mengajukan banding jadwal baru (preferensi_banding_hari/jam) yang akan diproses oleh Admin.
+    """
     body = await request.json()
     action = body.get("action", "submit")
     aid = body.get("ajuan_id") or body.get("ajuanId") or body.get("id")
@@ -357,32 +453,143 @@ async def handle_banding(request: Request, db: Session = Depends(get_db)):
     if not ajuan:
         raise HTTPException(status_code=404, detail={"status": "error", "message": "Ajuan tidak ditemukan."})
 
-    if action == "submit":
-        ajuan.status = "mengajukan_banding"
-        ajuan.alasan_banding = body.get("alasan") or body.get("alasan_banding", "")
-        ajuan.preferensi_banding_hari = body.get("preferensi_hari") or body.get("preferensi_banding_hari", ajuan.hari)
-        ajuan.preferensi_banding_jam = body.get("preferensi_jam") or body.get("preferensi_banding_jam", ajuan.jam_mulai)
+    if action in ["submit", "submit_banding"]:
+        ajuan.status = "menunggu_banding"
+        ajuan.alasan_banding = body.get("alasan") or body.get("alasan_banding") or body.get("alasanBanding", "")
+        ajuan.preferensi_banding_hari = body.get("preferensi_hari") or body.get("preferensi_banding_hari") or body.get("preferensiHari", ajuan.hari)
+        ajuan.preferensi_banding_jam = body.get("preferensi_jam") or body.get("preferensi_banding_jam") or body.get("preferensiJam", ajuan.jam_mulai)
         db.commit()
+        sync_ajuan_to_supabase(ajuan)
         return {"status": "success", "message": "Permohonan banding jadwal berhasil diajukan ke Admin.", "data": format_ajuan(ajuan)}
 
-    elif action in ["process", "accept"]:
-        ajuan.status = "disetujui_dekan"
-        if body.get("ruangan_nama"):
-            ajuan.ruangan_nama = body["ruangan_nama"]
-        if body.get("hari"):
-            ajuan.hari = body["hari"]
-        if body.get("jam_mulai"):
-            ajuan.jam_mulai = body["jam_mulai"]
-        if body.get("jam_selesai"):
-            ajuan.jam_selesai = body["jam_selesai"]
-        db.commit()
-        return {"status": "success", "message": "Banding disetujui Admin dan jadwal diperbarui.", "data": format_ajuan(ajuan)}
+    elif action in ["process", "accept", "admin_process_banding"]:
+        approve = body.get("approve", True)
+        if approve:
+            ajuan.status = "banding_disetujui"
+            catatan = body.get("catatan_admin") or body.get("catatanAdmin") or "Disetujui & Disesuaikan otomatis oleh RCK sesuai permohonan banding dosen."
+            ajuan.catatan_admin = catatan
+            ajuan.bentrok_detail = None
+            updated_data = body.get("updated_data") or body.get("updatedData")
+            if updated_data:
+                ajuan.ruangan_nama = updated_data.get("ruangan_nama") or updated_data.get("ruanganNama") or ajuan.ruangan_nama
+                ajuan.gedung_nama = updated_data.get("gedung_nama") or updated_data.get("gedungNama") or ajuan.gedung_nama
+                ajuan.hari = updated_data.get("hari") or ajuan.hari
+                ajuan.jam_mulai = updated_data.get("jam_mulai") or updated_data.get("jamMulai") or ajuan.jam_mulai
+                ajuan.jam_selesai = updated_data.get("jam_selesai") or updated_data.get("jamSelesai") or ajuan.jam_selesai
+            elif body.get("ruangan_nama"):
+                ajuan.ruangan_nama = body["ruangan_nama"]
+                if body.get("gedung_nama"): ajuan.gedung_nama = body["gedung_nama"]
+                if body.get("hari"): ajuan.hari = body["hari"]
+                if body.get("jam_mulai"): ajuan.jam_mulai = body["jam_mulai"]
+                if body.get("jam_selesai"): ajuan.jam_selesai = body["jam_selesai"]
+
+            j_id = f"JDW_{ajuan.id}"
+            exist_j = db.query(JadwalFinal).filter((JadwalFinal.id == j_id) | ((JadwalFinal.mata_kuliah_nama == ajuan.mata_kuliah_nama) & (JadwalFinal.kelas_nama == ajuan.kelas_nama))).first()
+            if exist_j:
+                exist_j.mata_kuliah_id = ajuan.mata_kuliah_id
+                exist_j.mata_kuliah_nama = ajuan.mata_kuliah_nama
+                exist_j.sks = ajuan.sks
+                exist_j.ruangan_nama = ajuan.ruangan_nama
+                exist_j.gedung_nama = ajuan.gedung_nama
+                exist_j.kelas_nama = ajuan.kelas_nama
+                exist_j.hari = ajuan.hari
+                exist_j.jam_mulai = ajuan.jam_mulai
+                exist_j.jam_selesai = ajuan.jam_selesai
+                exist_j.dosen_id = ajuan.dosen_id
+                exist_j.dosen_nama = ajuan.dosen_nama
+                exist_j.fakultas_nama = ajuan.fakultas_nama
+                exist_j.jurusan_nama = ajuan.jurusan_nama
+                exist_j.jumlah_mahasiswa = ajuan.jumlah_mahasiswa
+                jadwal = exist_j
+            else:
+                jadwal = JadwalFinal(
+                    id=j_id,
+                    mata_kuliah_id=ajuan.mata_kuliah_id,
+                    mata_kuliah_nama=ajuan.mata_kuliah_nama,
+                    sks=ajuan.sks,
+                    ruangan_nama=ajuan.ruangan_nama,
+                    gedung_nama=ajuan.gedung_nama,
+                    kelas_nama=ajuan.kelas_nama,
+                    hari=ajuan.hari,
+                    jam_mulai=ajuan.jam_mulai,
+                    jam_selesai=ajuan.jam_selesai,
+                    dosen_id=ajuan.dosen_id,
+                    dosen_nama=ajuan.dosen_nama,
+                    fakultas_nama=ajuan.fakultas_nama,
+                    jurusan_nama=ajuan.jurusan_nama,
+                    jumlah_mahasiswa=ajuan.jumlah_mahasiswa
+                )
+                db.add(jadwal)
+            db.commit()
+            sync_ajuan_to_supabase(ajuan)
+            sync_jadwal_to_supabase(jadwal)
+            return {"status": "success", "message": "Banding disetujui Admin dan jadwal diperbarui.", "data": format_ajuan(ajuan)}
+        else:
+            ajuan.status = "banding_ditolak"
+            ajuan.alasan_penolakan = body.get("alasan_penolakan") or body.get("alasanPenolakan") or body.get("catatanAdmin") or "Banding ditolak oleh Admin"
+            db.commit()
+            sync_ajuan_to_supabase(ajuan)
+            return {"status": "success", "message": "Banding ditolak oleh Admin.", "data": format_ajuan(ajuan)}
 
     elif action in ["reject", "reject_banding"]:
-        ajuan.status = "ditolak"
-        ajuan.alasan_penolakan = body.get("alasan_penolakan", "Banding ditolak oleh Admin")
+        ajuan.status = "banding_ditolak"
+        ajuan.alasan_penolakan = body.get("alasan_penolakan") or body.get("alasanPenolakan") or "Banding ditolak oleh Admin"
         db.commit()
+        sync_ajuan_to_supabase(ajuan)
         return {"status": "success", "message": "Banding ditolak oleh Admin.", "data": format_ajuan(ajuan)}
 
     db.commit()
+    sync_ajuan_to_supabase(ajuan)
     return {"status": "success", "data": format_ajuan(ajuan)}
+
+@router.delete("")
+@router.delete("/")
+@router.delete("/index.php")
+async def delete_ajuan_endpoint(
+    request: Request,
+    id: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    ids_to_delete = []
+    if id:
+        ids_to_delete.append(id)
+    
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            if "id" in body and body["id"]:
+                ids_to_delete.append(str(body["id"]))
+            if "ids" in body and isinstance(body["ids"], list):
+                ids_to_delete.extend([str(x) for x in body["ids"] if x])
+    except Exception:
+        pass
+
+    ids_to_delete = list(set(ids_to_delete))
+    if not ids_to_delete:
+        return {"status": "success", "message": "Tidak ada ID ajuan yang dihapus"}
+
+    for aid in ids_to_delete:
+        safe_id = sanitize_supabase_param(aid)
+        # Delete from local SQLite
+        db.query(JadwalFinal).filter((JadwalFinal.id == aid) | (JadwalFinal.id == f"JDW_{aid}")).delete(synchronize_session=False)
+        db.query(AjuanPengajaran).filter(AjuanPengajaran.id == aid).delete(synchronize_session=False)
+        
+        # Delete from Supabase
+        delete_ajuan_from_supabase(safe_id)
+        try:
+            requests.delete(
+                f"{SUPABASE_URL}/rest/v1/jadwal_final?or=(id.eq.{safe_id},id.eq.JDW_{safe_id})",
+                headers=SB_HEADERS,
+                timeout=5
+            )
+        except Exception:
+            pass
+
+    db.commit()
+    return {
+        "status": "success",
+        "message": f"Berhasil menghapus {len(ids_to_delete)} ajuan pengajaran permanen",
+        "deleted_ids": ids_to_delete
+    }
+
+

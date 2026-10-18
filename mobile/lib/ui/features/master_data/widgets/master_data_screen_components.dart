@@ -5,96 +5,34 @@
 import 'package:flutter/material.dart';
 
 import '../../../../config/constants.dart';
+import '../../../core/widgets/wave_header_card.dart';
 
 class MasterDataHeaderCard extends StatelessWidget {
-  const MasterDataHeaderCard({super.key});
+  final dynamic user;
+  const MasterDataHeaderCard({super.key, this.user});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.hub_rounded, color: Colors.white, size: 12),
-                    SizedBox(width: 4),
-                    Text(
-                      'MASTER DATA',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(AppRadius.sm),
-                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 11),
-                    SizedBox(width: 4),
-                    Text(
-                      'Super Admin',
-                      style: TextStyle(
-                        color: Color(0xFF047857),
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Pusat Master Data & Institusi',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 3),
-          const Text(
-            'Kelola gedung, fakultas, prodi, matkul, dan dosen prioritas',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
+    final role = user?.role ?? 'admin';
+    final isDekan = role == 'dekan';
+    final isKaProdi = role == 'kajur';
+
+    String title = 'Pusat Master Data & Institusi';
+    String subtitle = 'Kelola gedung, fakultas, prodi, matkul, dan dosen prioritas';
+
+    if (isKaProdi) {
+      final jur = user?.jurusanNama ?? 'Program Studi';
+      title = 'Master Data Program Studi';
+      subtitle = 'Kelola mata kuliah dan data dosen pengampu $jur';
+    } else if (isDekan) {
+      final fak = user?.fakultasNama ?? 'Fakultas';
+      title = 'Master Data Fakultas';
+      subtitle = 'Kelola mata kuliah dan data dosen di lingkungan $fak';
+    }
+
+    return WaveHeaderCard(
+      title: title,
+      subtitle: subtitle,
     );
   }
 }
@@ -182,11 +120,13 @@ class MasterDataSectionHeader extends StatelessWidget {
 class MasterDataExpandToggle extends StatelessWidget {
   final bool isExpanded;
   final VoidCallback onToggle;
+  final String? label;
 
   const MasterDataExpandToggle({
     super.key,
-    required this.isExpanded,
+    this.isExpanded = false,
     required this.onToggle,
+    this.label,
   });
 
   @override
@@ -203,7 +143,7 @@ class MasterDataExpandToggle extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  isExpanded ? 'Tampilkan Lebih Sedikit' : 'Lihat Selengkapnya',
+                  label ?? (isExpanded ? 'Tampilkan Lebih Sedikit' : 'Lihat Selengkapnya'),
                   style: const TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.bold,
@@ -211,14 +151,62 @@ class MasterDataExpandToggle extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 4),
-                Icon(
-                  isExpanded
-                      ? Icons.keyboard_arrow_up_rounded
-                      : Icons.keyboard_arrow_down_rounded,
-                  size: 16,
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 14,
                   color: AppColors.primary,
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class MasterDataPaginationBar extends StatelessWidget {
+  final int currentCount;
+  final int totalCount;
+  final int initialCount;
+  final VoidCallback onLoadMore;
+  final VoidCallback? onCollapse;
+
+  const MasterDataPaginationBar({
+    super.key,
+    required this.currentCount,
+    required this.totalCount,
+    this.initialCount = 10,
+    required this.onLoadMore,
+    this.onCollapse,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMore = totalCount > currentCount;
+
+    if (!hasMore) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: InkWell(
+        onTap: onLoadMore,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          alignment: Alignment.center,
+          child: const Text(
+            'Tampilkan Lainnya',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF475569),
             ),
           ),
         ),

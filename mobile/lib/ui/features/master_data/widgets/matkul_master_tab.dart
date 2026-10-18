@@ -12,6 +12,7 @@ class MatkulMasterList extends StatelessWidget {
   final bool isMultiSelectMode;
   final int totalSelectedCount;
   final int? limit;
+  final int startIndex;
   final bool isCompact;
   final void Function(String id) onToggleSelect;
   final void Function(Map<String, dynamic> matkul) onEdit;
@@ -25,6 +26,7 @@ class MatkulMasterList extends StatelessWidget {
     required this.isMultiSelectMode,
     required this.totalSelectedCount,
     this.limit,
+    this.startIndex = 1,
     this.isCompact = false,
     required this.onToggleSelect,
     required this.onEdit,
@@ -38,19 +40,29 @@ class MatkulMasterList extends StatelessWidget {
         ? kelasRaw.map((e) => e.toString()).toList()
         : <String>[];
     final kelasStr = kelasList.isNotEmpty ? kelasList.join(', ') : '-';
+    final smt =
+        int.tryParse(
+          m['semester']?.toString() ?? m['semester_angka']?.toString() ?? '',
+        ) ??
+        1;
+    final smtType = smt % 2 != 0 ? 'Ganjil' : 'Genap';
 
     showMasterDetailInfoDialog(
       context: context,
-      title: '${m['nama'] ?? 'Mata Kuliah'} (${m['kode'] ?? '-'})',
-      category: 'Mata Kuliah Kurikulum',
-      icon: Icons.menu_book_rounded,
+      title: (m['nama'] ?? 'Mata Kuliah').toString(),
+      category: 'Mata Kuliah (${m['kode'] ?? '-'})',
+      icon: Icons.book_outlined,
       details: [
         MapEntry('Kode Matkul', (m['kode'] ?? '-').toString()),
         MapEntry('Nama Matkul', (m['nama'] ?? '-').toString()),
-        MapEntry('Bobot SKS', '${m['sks'] ?? 3} SKS'),
-        MapEntry('Dosen Pengampu', (m['dosen'] ?? m['dosenNama'] ?? m['dosen_nama'] ?? '-').toString()),
-        MapEntry('Fakultas / Unit', (m['fakultas'] ?? '-').toString()),
+        MapEntry('SKS', '${m['sks'] ?? 0} SKS'),
+        MapEntry('Semester', 'Semester $smt ($smtType)'),
+        MapEntry(
+          'Fakultas / Prodi',
+          '${m['fakultas'] ?? '-'} • ${m['jurusan'] ?? '-'}',
+        ),
         MapEntry('Daftar Kelas', kelasStr),
+        MapEntry('Dosen Pengampu', (m['dosen'] ?? '-').toString()),
       ],
       onEdit: () => onEdit(m),
     );
@@ -68,8 +80,16 @@ class MatkulMasterList extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 6),
       itemBuilder: (context, index) {
         final m = displayList[index];
-        final id = (m['kode'] ?? '').toString();
+        final id = (m['kode'] ?? m['nama'] ?? m['id'] ?? '').toString();
         final isSelected = selectedMatkulIds.contains(id);
+        final smt =
+            int.tryParse(
+              m['semester']?.toString() ??
+                  m['semester_angka']?.toString() ??
+                  '',
+            ) ??
+            1;
+        final smtType = smt % 2 != 0 ? 'Ganjil' : 'Genap';
         final kelasRaw = m['kelas'];
         final List<String> kelasList = kelasRaw is List
             ? kelasRaw.map((e) => e.toString()).toList()
@@ -104,7 +124,9 @@ class MatkulMasterList extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
+              color: isSelected
+                  ? AppColors.primary.withValues(alpha: 0.08)
+                  : Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
@@ -114,16 +136,29 @@ class MatkulMasterList extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.menu_book_rounded,
-                    color: isSelected ? Colors.white : AppColors.primary,
-                    size: 18,
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onToggleSelect(id),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primary
+                          : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, size: 14, color: Colors.white)
+                        : Text(
+                            '${startIndex + index}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -139,7 +174,9 @@ class MatkulMasterList extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.bold,
-                                color: isSelected ? AppColors.primary : const Color(0xFF0F172A),
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : const Color(0xFF0F172A),
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -147,15 +184,50 @@ class MatkulMasterList extends StatelessWidget {
                           ),
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFF0284C7,
+                              ).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: const Color(
+                                  0xFF0284C7,
+                                ).withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              'Smt $smt ($smtType)',
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF0284C7),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.3),
+                              ),
                             ),
                             child: Text(
                               '${m['sks'] ?? 3} SKS',
-                              style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: AppColors.primary),
+                              style: const TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
                             ),
                           ),
                         ],
@@ -163,7 +235,11 @@ class MatkulMasterList extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         'Dosen: ${m['dosen'] ?? m['dosenNama'] ?? m['dosen_nama'] ?? '-'}',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF334155),
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -171,7 +247,10 @@ class MatkulMasterList extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           'Kelas: $kelasStr • ${m['fakultas'] ?? '-'}',
-                          style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: Color(0xFF64748B),
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -187,7 +266,11 @@ class MatkulMasterList extends StatelessWidget {
                       color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check, size: 12, color: Colors.white),
+                    child: const Icon(
+                      Icons.check,
+                      size: 12,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               ],

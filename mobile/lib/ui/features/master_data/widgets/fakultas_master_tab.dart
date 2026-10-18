@@ -12,6 +12,7 @@ class FakultasMasterList extends StatelessWidget {
   final bool isMultiSelectMode;
   final int totalSelectedCount;
   final int? limit;
+  final int startIndex;
   final bool isCompact;
   final void Function(String id) onToggleSelect;
   final void Function(Map<String, dynamic> fakultas) onEdit;
@@ -25,6 +26,7 @@ class FakultasMasterList extends StatelessWidget {
     required this.isMultiSelectMode,
     required this.totalSelectedCount,
     this.limit,
+    this.startIndex = 1,
     this.isCompact = false,
     required this.onToggleSelect,
     required this.onEdit,
@@ -113,16 +115,27 @@ class FakultasMasterList extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.account_balance_outlined,
-                    color: isSelected ? Colors.white : AppColors.primary,
-                    size: 18,
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onToggleSelect(id),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, size: 14, color: Colors.white)
+                        : Text(
+                            '${startIndex + index}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 10),

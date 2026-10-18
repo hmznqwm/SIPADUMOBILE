@@ -7,3 +7,4 @@ export 'dialogs/gedung_form_dialog.dart';
 export 'dialogs/gedung_ruangan_bottom_sheet.dart';
 export 'dialogs/master_context_menu_dialogs.dart';
 export 'dialogs/matakuliah_form_dialog.dart';
+export 'dialogs/quick_add_master_dialogs.dart';

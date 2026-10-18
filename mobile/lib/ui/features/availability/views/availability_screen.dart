@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../config/constants.dart';
+import '../../../../data/mock/mock_database.dart';
 import '../../../../data/models/ajuan_pengajaran_model.dart';
 import '../../../../data/services/api_service.dart';
 import '../../auth/view_models/auth_view_model.dart';
@@ -28,6 +29,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
   int _dosenSelectedSubTab = 0; // 0: Matriks Ketersediaan Waktu, 1: Ajuan Jam & Ruang Mengajar
   List<AjuanPengajaranModel> _liveAjuanList = [];
   bool _isLoadingAjuan = false;
+  ApiService? _apiService;
 
   // Multi-select state khusus Admin, Dekan, KaProdi, Dosen di Tab Pengajuan
   final Set<String> _selectedAjuanIds = {};
@@ -38,23 +40,31 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
   @override
   void initState() {
     super.initState();
+    _syncFromMockDatabase();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AvailabilityViewModel>().loadAvailabilityData();
       _loadAjuanData();
     });
   }
 
-  Future<void> _loadAjuanData() async {
-    if (!mounted) return;
-    setState(() => _isLoadingAjuan = true);
-    try {
-      final api = context.read<ApiService>();
-      final list = await api.getAjuanPengajaranList();
-      final ruanganModels = await api.getRuanganList();
-      final mapList = ruanganModels.map((r) => {
+  void _syncFromMockDatabase() {
+    final list = MockDatabase.ruanganList
+        .where((r) =>
+            !MockDatabase.deletedRuanganIds.contains(r.id) &&
+            !MockDatabase.deletedRuanganIds.contains(r.nama))
+        .toList();
+    _dynamicRuanganList = list.map((r) {
+      String gName = r.gedungNama;
+      if (gName.isEmpty) {
+        final g = MockDatabase.gedungList
+            .where((g) => g.id == r.gedungId)
+            .firstOrNull;
+        if (g != null) gName = g.nama;
+      }
+      return {
         'id': r.id,
         'nama': r.nama,
-        'gedung': r.gedungNama,
+        'gedung': gName.isNotEmpty ? gName : 'Gedung Kuliah',
         'lantai': 'Lantai 1',
         'kapasitas': r.kapasitas,
         'tipe': r.tipeRuangan,
@@ -62,6 +72,63 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
         'hariKosong': ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'],
         'hariFormatted': 'Senin - Sabtu',
         'jamKosong': '07:30 - 16:20 WIB',
+      };
+    }).toList();
+    _liveAjuanList = MockDatabase.ajuanPengajaranList;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final api = Provider.of<ApiService>(context);
+    if (_apiService != api) {
+      _apiService?.removeListener(_onApiChanged);
+      _apiService = api;
+      _apiService?.addListener(_onApiChanged);
+    }
+  }
+
+  void _onApiChanged() {
+    if (mounted) {
+      _loadAjuanData(silent: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _apiService?.removeListener(_onApiChanged);
+    super.dispose();
+  }
+
+  Future<void> _loadAjuanData({bool silent = false}) async {
+    if (!mounted) return;
+    if (!silent && _dynamicRuanganList.isEmpty) {
+      setState(() => _isLoadingAjuan = true);
+    }
+    try {
+      final api = context.read<ApiService>();
+      final list = await api.getAjuanPengajaranList();
+      final ruanganModels = await api.getRuanganList();
+      final mapList = ruanganModels.map((r) {
+        String gName = r.gedungNama;
+        if (gName.isEmpty) {
+          final g = MockDatabase.gedungList
+              .where((g) => g.id == r.gedungId)
+              .firstOrNull;
+          if (g != null) gName = g.nama;
+        }
+        return {
+          'id': r.id,
+          'nama': r.nama,
+          'gedung': gName.isNotEmpty ? gName : 'Gedung Kuliah',
+          'lantai': 'Lantai 1',
+          'kapasitas': r.kapasitas,
+          'tipe': r.tipeRuangan,
+          'status': 'Tersedia',
+          'hariKosong': ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'],
+          'hariFormatted': 'Senin - Sabtu',
+          'jamKosong': '07:30 - 16:20 WIB',
+        };
       }).toList();
 
       if (mounted) {

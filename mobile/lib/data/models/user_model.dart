@@ -74,16 +74,16 @@ class UserModel {
     }
 
     final String rawId = json['id']?.toString().trim() ?? '';
-    final String resolvedId = rawId.isNotEmpty ? rawId : (id.isNotEmpty ? id : 'DSN001');
+    final String resolvedId = rawId.isNotEmpty ? rawId : id;
 
     return UserModel(
       id: resolvedId,
-      nama: json['nama']?.toString() ?? (role == 'admin' ? 'Administrator' : 'Pengguna'),
+      nama: json['nama']?.toString() ?? '',
       email: email,
       role: role,
-      jurusanId: json['jurusanId']?.toString() ?? json['jurusan_id']?.toString() ?? (role == 'admin' ? 'GLOBAL' : 'JUR001'),
-      jurusanNama: json['jurusanNama']?.toString() ?? json['jurusan_nama']?.toString() ?? (role == 'admin' ? 'Administrator Sistem' : 'Teknik Informatika'),
-      fakultasNama: json['fakultasNama']?.toString() ?? json['fakultas_nama']?.toString() ?? (role == 'admin' ? 'Universitas' : 'Fakultas Sains & Teknologi'),
+      jurusanId: json['jurusanId']?.toString() ?? json['jurusan_id']?.toString() ?? (role == 'admin' ? 'GLOBAL' : ''),
+      jurusanNama: json['jurusanNama']?.toString() ?? json['jurusan_nama']?.toString() ?? (role == 'admin' ? 'Administrator Sistem' : ''),
+      fakultasNama: json['fakultasNama']?.toString() ?? json['fakultas_nama']?.toString() ?? (role == 'admin' ? 'Universitas' : ''),
       matkulNama: json['matkulNama']?.toString() ?? json['matkul_nama']?.toString(),
       isPriority: json['isPriority'] == true || json['isPriority'] == 1 || json['is_priority'] == 1 || json['is_priority'] == true,
       token: json['token']?.toString(),

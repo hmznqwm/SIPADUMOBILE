@@ -230,3 +230,55 @@ INSERT INTO mata_kuliah (id, nama, sks, jurusan_id, jurusan_nama, fakultas_nama,
 ('MK004', 'Kecerdasan Buatan & Machine Learning', 3, 'JUR001', 'Teknik Informatika', 'Fakultas Sains & Teknologi', 'DOS002', 5, 'Kelas Teori'),
 ('MK005', 'Pemrograman Mobile (Flutter)', 3, 'JUR001', 'Teknik Informatika', 'Fakultas Sains & Teknologi', 'DOS003', 5, 'Laboratorium Komputer')
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- 13. TABEL TOKEN BLACKLIST (LOGOUT REVOCATION)
+CREATE TABLE IF NOT EXISTS token_blacklist (
+  id SERIAL PRIMARY KEY,
+  token VARCHAR(500) NOT NULL UNIQUE,
+  revoked_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
+);
+
+-- ============================================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- ============================================================
+
+-- Enable RLS on all tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gedung ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ruangan ENABLE ROW LEVEL SECURITY;
+ALTER TABLE slot_waktu ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mata_kuliah ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mata_kuliah_kelas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE availability ENABLE ROW LEVEL SECURITY;
+ALTER TABLE availability_slots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ajuan_pengajaran ENABLE ROW LEVEL SECURITY;
+ALTER TABLE jadwal_final ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE password_resets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE token_blacklist ENABLE ROW LEVEL SECURITY;
+
+-- Service Role Key has full access (Used by Python FastAPI backend)
+CREATE POLICY "Service Role Full Access users" ON users FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access gedung" ON gedung FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access ruangan" ON ruangan FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access slot_waktu" ON slot_waktu FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access mata_kuliah" ON mata_kuliah FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access mata_kuliah_kelas" ON mata_kuliah_kelas FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access availability" ON availability FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access availability_slots" ON availability_slots FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access ajuan_pengajaran" ON ajuan_pengajaran FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access jadwal_final" ON jadwal_final FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access notifications" ON notifications FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access password_resets" ON password_resets FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+CREATE POLICY "Service Role Full Access token_blacklist" ON token_blacklist FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR current_user = 'postgres');
+
+-- Read-only policies for public/anon clients (excluding sensitive password & token tables)
+CREATE POLICY "Public Read Gedung" ON gedung FOR SELECT USING (true);
+CREATE POLICY "Public Read Ruangan" ON ruangan FOR SELECT USING (true);
+CREATE POLICY "Public Read SlotWaktu" ON slot_waktu FOR SELECT USING (true);
+CREATE POLICY "Public Read MataKuliah" ON mata_kuliah FOR SELECT USING (true);
+CREATE POLICY "Public Read JadwalFinal" ON jadwal_final FOR SELECT USING (true);
+
+

@@ -91,7 +91,7 @@ void showKajurFilterBottomSheet({
                     child: DropdownButton<String>(
                       value: tempStatus,
                       isExpanded: true,
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+                      icon: const SizedBox.shrink(),
                       style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                       items: const [
                         DropdownMenuItem(value: 'Semua', child: Text('Semua Status')),

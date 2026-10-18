@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -133,6 +137,13 @@ def get_schedules(
     fakultas: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
+    """
+    [PRESENTASI] Menampilkan Jadwal Publik:
+    Menggabungkan 2 sumber data:
+    1. JadwalFinal (yang sudah paten/disetujui)
+    2. AjuanPengajaran (yang masih berproses)
+    Hal ini memungkinkan mahasiswa/dosen melihat secara real-time jadwal yang fix maupun yang masih diajukan.
+    """
     did = dosenId or dosen_id
     jur = jurusan or prodi
 
@@ -140,8 +151,17 @@ def get_schedules(
     try:
         r_j = requests.get(f"{SUPABASE_URL}/rest/v1/jadwal_final?select=*", headers=SB_HEADERS, timeout=6)
         if r_j.status_code == 200:
+            supabase_jadwal_data = r_j.json()
+            supabase_jadwal_ids = {jd["id"] for jd in supabase_jadwal_data}
+            
             existing_jdw = {j.id: j for j in db.query(JadwalFinal).all()}
-            for jd in r_j.json():
+            
+            # Hapus record lokal yang sudah tidak ada di Supabase
+            for jid, ex_jadwal in existing_jdw.items():
+                if jid not in supabase_jadwal_ids:
+                    db.delete(ex_jadwal)
+                    
+            for jd in supabase_jadwal_data:
                 ex = existing_jdw.get(jd["id"])
                 if not ex:
                     ex = JadwalFinal(id=jd["id"])
@@ -169,8 +189,17 @@ def get_schedules(
     try:
         r_a = requests.get(f"{SUPABASE_URL}/rest/v1/ajuan_pengajaran?select=*", headers=SB_HEADERS, timeout=6)
         if r_a.status_code == 200:
+            supabase_ajuan_data = r_a.json()
+            supabase_ajuan_ids = {ad["id"] for ad in supabase_ajuan_data}
+            
             existing_aj = {a.id: a for a in db.query(AjuanPengajaran).all()}
-            for ad in r_a.json():
+            
+            # Hapus record lokal yang sudah tidak ada di Supabase
+            for aid, ex_ajuan in existing_aj.items():
+                if aid not in supabase_ajuan_ids:
+                    db.delete(ex_ajuan)
+                    
+            for ad in supabase_ajuan_data:
                 ex_a = existing_aj.get(ad["id"])
                 if not ex_a:
                     ex_a = AjuanPengajaran(id=ad["id"])
@@ -228,7 +257,7 @@ def get_schedules(
 
     items_ajuan = q_a.all()
     for a in items_ajuan:
-        if a.id not in existing_ids:
+        if a.id not in existing_ids and f"JDW_{a.id}" not in existing_ids:
             data.append(format_ajuan_as_jadwal(a))
 
     return {"status": "success", "data": data}
@@ -263,8 +292,8 @@ async def create_schedule(request: Request, db: Session = Depends(get_db)):
         jam_selesai=body.get("jam_selesai") or body.get("jamSelesai", "10:00"),
         dosen_id=body.get("dosen_id") or body.get("dosenId"),
         dosen_nama=body.get("dosen_nama") or body.get("dosenNama"),
-        fakultas_nama=body.get("fakultas_nama") or body.get("fakultasNama", "Fakultas Sains & Teknologi"),
-        jurusan_nama=body.get("jurusan_nama") or body.get("jurusanNama") or body.get("prodi", "Teknik Informatika"),
+        fakultas_nama=body.get("fakultas_nama") or body.get("fakultasNama", ""),
+        jurusan_nama=body.get("jurusan_nama") or body.get("jurusanNama") or body.get("prodi", ""),
         jumlah_mahasiswa=int(body.get("jumlah_mahasiswa") or body.get("jumlahMahasiswa", 35))
     )
     db.add(jadwal)

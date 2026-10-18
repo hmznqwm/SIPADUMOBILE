@@ -36,30 +36,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'jadwal_published':
         return Icons.calendar_today_outlined;
       case 'availability_request':
-        return Icons.warning_amber_rounded;
+        return Icons.event_available_outlined;
       case 'approval':
-        return Icons.check_circle_outline;
+        return Icons.fact_check_outlined;
       case 'success':
-        return Icons.verified_outlined;
+        return Icons.check_circle_outline_rounded;
+      case 'warning':
+        return Icons.warning_amber_rounded;
+      case 'conflict':
+        return Icons.error_outline_rounded;
       case 'info':
       default:
-        return Icons.info_outline;
+        return Icons.notifications_none_rounded;
     }
   }
 
   Color _getNotificationColor(String type) {
     switch (type) {
       case 'jadwal_published':
-        return AppColors.primary;
+        return const Color(0xFF0369A1); // Sky / Blue
       case 'availability_request':
-        return AppColors.pending;
+        return const Color(0xFFD97706); // Amber
       case 'approval':
-        return AppColors.available;
+        return const Color(0xFF7C3AED); // Purple
       case 'success':
-        return const Color(0xFF16A34A);
+        return const Color(0xFF16A34A); // Green
+      case 'warning':
+        return const Color(0xFFEA580C); // Orange
+      case 'conflict':
+        return const Color(0xFFDC2626); // Red
       case 'info':
       default:
-        return AppColors.info;
+        return const Color(0xFF475569); // Slate
     }
   }
 

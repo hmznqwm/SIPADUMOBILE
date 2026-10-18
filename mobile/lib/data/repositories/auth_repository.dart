@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:encrypt/encrypt.dart' as enc;
 
 import '../models/user_model.dart';
 import '../services/api_service.dart';
@@ -11,19 +12,51 @@ class AuthRepository {
   final ApiService _apiService;
   UserModel? _currentUser;
 
+  // Enkripsi Kriptografis AES-256 untuk perlindungan data sesi lokal (At-Rest Encryption)
+  static final enc.Key _encKey = enc.Key.fromUtf8('sipadu_secure_session_key_2026_!');
+  static final enc.IV _encIv = enc.IV.fromUtf8('sipadu_iv_2026_!');
+
   AuthRepository({required ApiService apiService}) : _apiService = apiService;
 
   UserModel? get currentUser => _currentUser;
 
-  /// Memuat sesi login tersimpan dari SharedPreferences jika ada
+  /// Enkripsi string data sesi menggunakan AES-CBC
+  String _encryptData(String plainText) {
+    try {
+      final encrypter = enc.Encrypter(enc.AES(_encKey, mode: enc.AESMode.cbc));
+      final encrypted = encrypter.encrypt(plainText, iv: _encIv);
+      return 'enc:${encrypted.base64}';
+    } catch (e) {
+      debugPrint('Enkripsi data sesi gagal, fallback ke plain: $e');
+      return plainText;
+    }
+  }
+
+  /// Dekripsi string data sesi terenkripsi (Mendukung backward compatibility)
+  String _decryptData(String rawText) {
+    try {
+      if (rawText.startsWith('enc:')) {
+        final rawBase64 = rawText.substring(4);
+        final encrypter = enc.Encrypter(enc.AES(_encKey, mode: enc.AESMode.cbc));
+        return encrypter.decrypt64(rawBase64, iv: _encIv);
+      }
+      return rawText;
+    } catch (e) {
+      debugPrint('Dekripsi data sesi gagal: $e');
+      return rawText;
+    }
+  }
+
+  /// [PRESENTASI] Fitur 'Tetap Masuk' (Remember Me):
+  /// Memuat dan mendekripsi sesi login tersimpan dari SharedPreferences.
   Future<UserModel?> loadSavedUserSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_userSessionKey);
-      if (jsonStr != null && jsonStr.isNotEmpty) {
+      final rawStr = prefs.getString(_userSessionKey);
+      if (rawStr != null && rawStr.isNotEmpty) {
+        final jsonStr = _decryptData(rawStr);
         final Map<String, dynamic> map = jsonDecode(jsonStr);
         var user = UserModel.fromJson(map);
-        // Role ditentukan sepenuhnya oleh database server, bukan client-side logic
         final savedAvatar = prefs.getString('user_avatar_${user.id}');
         if (savedAvatar != null && savedAvatar.isNotEmpty) {
           user = user.copyWith(avatarPath: savedAvatar);
@@ -81,14 +114,15 @@ class AuthRepository {
     }
   }
 
-  /// Menyimpan data user login ke SharedPreferences
+  /// Menyimpan data user login ke SharedPreferences secara terenkripsi AES-256
   Future<void> _saveSession(UserModel user) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = jsonEncode(user.toJson());
-      await prefs.setString(_userSessionKey, jsonStr);
+      final encryptedStr = _encryptData(jsonStr);
+      await prefs.setString(_userSessionKey, encryptedStr);
     } catch (e) {
-      debugPrint('Error saving user session: $e');
+      debugPrint('Error saving encrypted user session: $e');
     }
   }
 
@@ -177,7 +211,13 @@ class AuthRepository {
     );
   }
 
+  /// Logout dengan mencabut token di server dan membersihkan sesi lokal
   Future<void> logout() async {
+    try {
+      await _apiService.logout();
+    } catch (e) {
+      debugPrint('Logout remote revocation notification error: $e');
+    }
     _currentUser = null;
     await _clearSession();
   }

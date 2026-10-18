@@ -5,6 +5,10 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+base {
+    archivesName.set("SipaduMobile")
+}
+
 android {
     namespace = "com.smartscheduler.smart_course_scheduler"
     compileSdk = flutter.compileSdkVersion

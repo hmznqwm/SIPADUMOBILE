@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../config/constants.dart';
+import '../../../../data/mock/mock_database.dart';
 import '../../../../data/models/user_model.dart';
 import '../view_models/schedule_view_model.dart';
 
@@ -37,20 +38,24 @@ class ScheduleFilterBar extends StatelessWidget {
           builder: (context, setBottomSheetState) {
             // Available prodis based on tempFakultas
             final prodisForFakultas = <String>{'Semua Prodi'};
-            for (final item in viewModel.jadwalList) {
-              final isFakMatch = tempFakultas == 'Semua Fakultas' ||
-                  item.fakultasNama == tempFakultas ||
-                  (tempFakultas.contains('Ekonomi') && (item.fakultasNama?.contains('Ekonomi') ?? false));
-              if (isFakMatch && item.jurusanNama != null && item.jurusanNama!.isNotEmpty) {
-                prodisForFakultas.add(item.jurusanNama!);
+            for (final f in MockDatabase.fakultasData) {
+              final fNama = (f['nama'] ?? '').toString().trim();
+              if (tempFakultas == 'Semua Fakultas' || fNama == tempFakultas) {
+                final jurRaw = f['jurusan'];
+                if (jurRaw is List) {
+                  for (final j in jurRaw) {
+                    final jStr = j.toString().trim();
+                    if (jStr.isNotEmpty) prodisForFakultas.add(jStr);
+                  }
+                }
               }
             }
-            if (tempFakultas == 'Fakultas Sains & Teknologi') {
-              prodisForFakultas.add('Teknik Informatika');
-              prodisForFakultas.add('Sistem Informasi');
-            } else if (tempFakultas.contains('Ekonomi')) {
-              prodisForFakultas.add('Manajemen');
-              prodisForFakultas.add('Akuntansi');
+            for (final item in viewModel.jadwalList) {
+              final isFakMatch = tempFakultas == 'Semua Fakultas' ||
+                  item.fakultasNama == tempFakultas;
+              if (isFakMatch && item.jurusanNama != null && item.jurusanNama!.trim().isNotEmpty) {
+                prodisForFakultas.add(item.jurusanNama!.trim());
+              }
             }
 
             final prodiList = prodisForFakultas.toList();
@@ -130,20 +135,18 @@ class ScheduleFilterBar extends StatelessWidget {
                       child: DropdownButton<String>(
                         value: viewModel.availableDays.contains(tempDay) ? tempDay : 'Semua',
                         isExpanded: true,
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+                        icon: const SizedBox.shrink(),
                         style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                         items: viewModel.availableDays.map((day) {
                           return DropdownMenuItem<String>(
                             value: day,
-                            child: Row(
-                              children: [
-                                const Icon(Icons.today_rounded, size: 16, color: AppColors.primary),
-                                const SizedBox(width: 8),
-                                Text(
-                                  day == 'Semua' ? 'Semua Hari (Senin - Jumat)' : 'Hari $day',
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF0F172A)),
-                                ),
-                              ],
+                            child: Text(
+                              day == 'Semua' ? 'Semua Hari (Senin - Jumat)' : 'Hari $day',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF0F172A),
+                              ),
                             ),
                           );
                         }).toList(),
@@ -177,7 +180,7 @@ class ScheduleFilterBar extends StatelessWidget {
                         child: DropdownButton<String>(
                           value: viewModel.availableFakultas.contains(tempFakultas) ? tempFakultas : 'Semua Fakultas',
                           isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+                          icon: const SizedBox.shrink(),
                           style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                           items: viewModel.availableFakultas.map((fak) {
                             return DropdownMenuItem<String>(
@@ -217,7 +220,7 @@ class ScheduleFilterBar extends StatelessWidget {
                         child: DropdownButton<String>(
                           value: prodiList.contains(tempProdi) ? tempProdi : 'Semua Prodi',
                           isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+                          icon: const SizedBox.shrink(),
                           style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
                           items: prodiList.map((prodi) {
                             return DropdownMenuItem<String>(
@@ -258,7 +261,7 @@ class ScheduleFilterBar extends StatelessWidget {
                                 Text(
                                   user != null && user!.jurusanNama.isNotEmpty
                                       ? user!.jurusanNama
-                                      : 'Teknik Informatika',
+                                      : '-',
                                   style: const TextStyle(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.bold,
@@ -555,15 +558,7 @@ class ScheduleFilterBar extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 6),
                     ],
-                    Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 20,
-                      color: activeFilterCount > 0
-                          ? AppColors.primary
-                          : const Color(0xFF64748B),
-                    ),
                   ],
                 ),
               ),

@@ -78,42 +78,23 @@ class ConflictCheckBottomSheet {
                   const SizedBox(height: 14),
 
                   // Header
-                  Row(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: (hasConflict ? const Color(0xFFEF4444) : AppColors.primary).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          hasConflict ? Icons.error_outline_rounded : Icons.verified_user_outlined,
-                          color: hasConflict ? const Color(0xFFDC2626) : AppColors.primary,
-                          size: 24,
+                      const Text(
+                        'Cek Batasan & Bentrok Jadwal',
+                        style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Cek Batasan & Bentrok Jadwal',
-                              style: TextStyle(
-                                color: Color(0xFF0F172A),
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${ajuan.mataKuliahNama} • ${ajuan.gedungNama}',
-                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${ajuan.mataKuliahNama} • ${ajuan.gedungNama}',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -246,8 +227,10 @@ class ConflictCheckBottomSheet {
                           _buildSimpleRow('Waktu', '${ajuan.hari}, ${ajuan.waktuFormatted}'),
                           const Divider(height: 10, color: Color(0xFFE2E8F0)),
                           _buildSimpleRow('Ruangan', '${ajuan.gedungNama} — ${ajuan.ruanganNama}'),
-                          const Divider(height: 10, color: Color(0xFFE2E8F0)),
-                          _buildSimpleRow('Rombel', 'Kelas ${ajuan.kelasNama} (${ajuan.jumlahMahasiswa} Mhs, Smt ${ajuan.semester})'),
+                          _buildSimpleRow(
+                            'Rombel',
+                            '${ajuan.kelasNama.trim().toLowerCase().startsWith('kelas') ? ajuan.kelasNama.trim() : 'Kelas ${ajuan.kelasNama.trim()}'} (${ajuan.jumlahMahasiswa} Mhs, Smt ${ajuan.semester})',
+                          ),
                         ],
                       ),
                     ),

@@ -4,48 +4,43 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from core.config import settings
 
-# Database connection URL (Default to smartschedule.db SQLite with Supabase cloud sync)
+# [PRESENTASI] Konfigurasi Database URL
+# Secara default, aplikasi menggunakan SQLite lokal ('smartschedule.db').
 DATABASE_URL = settings.DATABASE_URL
 
-# On Vercel / serverless environment with SQLite, use in-memory DB to prevent read-only filesystem errors
+# [PRESENTASI] Deteksi Environment Serverless (Vercel)
+# Jika aplikasi berjalan di Vercel (read-only filesystem) dan menggunakan SQLite, ubah ke in-memory database agar tidak terjadi error penulisan file.
 if (os.getenv("VERCEL") or os.getenv("VERCEL_ENV")) and DATABASE_URL.startswith("sqlite"):
-    DATABASE_URL = "sqlite:///:memory:"
+    DATABASE_URL = "sqlite:////tmp/smartschedule.db"
 
-# Database Engine Configuration
+# [PRESENTASI] Konfigurasi Engine Database (SQLAlchemy)
 if DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
-    extra_kwargs = {}
-    if ":memory:" in DATABASE_URL:
-        from sqlalchemy.pool import StaticPool
-        extra_kwargs["poolclass"] = StaticPool
-        extra_kwargs["connect_args"] = connect_args
-    else:
-        extra_kwargs["connect_args"] = connect_args
-        extra_kwargs["pool_pre_ping"] = True
-
+    extra_kwargs = {"connect_args": connect_args, "pool_pre_ping": True}
     engine = create_engine(DATABASE_URL, **extra_kwargs)
 else:
+    # [PRESENTASI] Konfigurasi untuk Database relasional lain (seperti PostgreSQL)
     engine = create_engine(
         DATABASE_URL,
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20
+        pool_pre_ping=True, # Menguji koneksi sebelum mengeksekusi query (mencegah error 'MySQL server has gone away')
+        pool_size=10,       # Maksimal 10 koneksi tetap yang dibuka
+        max_overflow=20     # Maksimal 20 koneksi tambahan jika sistem sedang sibuk
     )
 
+# [PRESENTASI] Membuat factory (pabrik) session untuk interaksi dengan database
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# [PRESENTASI] Base class yang akan di-inherit (diwariskan) oleh semua model database kita (Tabel)
 Base = declarative_base()
 
+# [PRESENTASI] Dependency Injection: Menyediakan Session Database ke setiap endpoint FastAPI
+# Fungsi ini membuka koneksi DB saat API diakses, lalu memutus/menutup koneksi setelah respon dikirim.
 def get_db():
-    db = None
+    db = SessionLocal()
     try:
-        db = SessionLocal()
         yield db
-    except Exception:
-        yield None
     finally:
-        if db is not None:
-            try:
-                db.close()
-            except Exception:
-                pass
+        try:
+            db.close()
+        except Exception:
+            pass

@@ -6,14 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../config/constants.dart';
+import '../../../../data/mock/mock_database.dart';
 import '../../../../data/models/ajuan_pengajaran_model.dart';
 import '../../../../data/models/gedung_model.dart';
 import '../../../../data/models/jadwal_model.dart';
 import '../../../../data/models/ruangan_model.dart';
 import '../../../../data/models/user_model.dart';
 import '../../../../data/services/api_service.dart';
+import '../../../core/widgets/wave_header_card.dart';
 import '../widgets/admin_automation_section.dart';
-import '../widgets/admin_banding_section.dart';
 import '../widgets/admin_stat_cards.dart';
 import '../widgets/csp_confirmation_dialog.dart';
 import '../widgets/csp_execution_result_dialog.dart';
@@ -31,26 +32,67 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
   List<GedungModel> _gedungList = [];
   List<RuanganModel> _ruanganList = [];
   List<UserModel> _allUsersList = [];
+  List<Map<String, dynamic>> _fakultasList = [];
   List<AjuanPengajaranModel> _allAjuanList = [];
   List<dynamic> _allMatkulList = [];
   List<JadwalModel> _jadwalList = [];
   bool _isLoading = true;
+  ApiService? _apiService;
 
   @override
   void initState() {
     super.initState();
+    _syncFromMockDatabase();
     _loadAdminData();
   }
 
-  Future<void> _loadAdminData() async {
+  void _syncFromMockDatabase() {
+    _gedungList = [];
+    _ruanganList = [];
+    _allUsersList = [];
+    _fakultasList = [];
+    _allAjuanList = [];
+    _allMatkulList = [];
+    _jadwalList = [];
+    _isLoading = true;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final api = Provider.of<ApiService>(context);
+    if (_apiService != api) {
+      _apiService?.removeListener(_onApiChanged);
+      _apiService = api;
+      _apiService?.addListener(_onApiChanged);
+    }
+  }
+
+  void _onApiChanged() {
+    if (mounted) {
+      _loadAdminData(silent: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _apiService?.removeListener(_onApiChanged);
+    super.dispose();
+  }
+
+  Future<void> _loadAdminData({bool silent = false}) async {
     if (!mounted) return;
-    setState(() => _isLoading = true);
+    if (!silent && _ruanganList.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     try {
       final api = context.read<ApiService>();
+      await MockDatabase.initLocalCache(forceReload: true);
       final active = await api.getSubmissionWindowStatus();
       final gedung = await api.getGedungList();
       final ruangan = await api.getRuanganList();
       final users = await api.getAllUsers();
+      final fakultas = await api.getFakultasList();
       final ajuan = await api.getAjuanPengajaranList();
       final matkul = await api.getAllMataKuliah();
       final jadwal = await api.getGlobalJadwal();
@@ -61,6 +103,7 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
           _gedungList = gedung;
           _ruanganList = ruangan;
           _allUsersList = users;
+          _fakultasList = fakultas;
           _allAjuanList = ajuan;
           _allMatkulList = matkul;
           _jadwalList = jadwal;
@@ -92,7 +135,7 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
   }
 
   bool get _isAllApprovedAndConflictFree {
-    if (_allAjuanList.isEmpty) return true;
+    if (_allAjuanList.isEmpty) return false;
     final unapprovedOrPending = _allAjuanList.where((a) =>
         a.status != 'disetujui_admin' &&
         a.status != 'disetujui' &&
@@ -104,6 +147,7 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
   }
 
   Future<void> _runCSPEngine() async {
+    if (_allAjuanList.isEmpty) return;
     if (_isAllApprovedAndConflictFree) {
       final forceRun = await showModalBottomSheet<bool>(
         context: context,
@@ -263,91 +307,11 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Header Super Admin (Perpaduan Hijau & Putih Harmonis) ──
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(AppRadius.full),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.shield_outlined, color: Colors.white, size: 12),
-                        SizedBox(width: 4),
-                        Text(
-                          'SUPER ADMIN',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.6,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                      border: Border.all(color: const Color(0xFFA7F3D0)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.check_circle_rounded, color: Color(0xFF059669), size: 11),
-                        SizedBox(width: 4),
-                        Text(
-                          'System Online',
-                          style: TextStyle(
-                            color: Color(0xFF047857),
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Panel Kontrol Admin',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 3),
-              const Text(
-                'Kelola penjadwalan institusi',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
+        // ── Header Super Admin (Split Wave 2-Warna) ──
+        const WaveHeaderCard(
+          showBrand: true,
+          title: 'Panel Kontrol Admin',
+          subtitle: 'Kelola penjadwalan terintegrasi institusi & fakultas.',
         ),
         const SizedBox(height: AppSpacing.md),
 
@@ -357,6 +321,7 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
           ruanganList: _ruanganList,
           allUsersList: _allUsersList,
           allMatkulList: _allMatkulList,
+          fakultasList: _fakultasList,
           allAjuanList: _allAjuanList,
           jadwalList: _jadwalList,
         ),
@@ -366,17 +331,13 @@ class _AdminDashboardViewState extends State<AdminDashboardView> {
         AdminAutomationSection(
           isSubmissionActive: _isSubmissionActive,
           isEngineRunning: _isEngineRunning,
+          hasAjuan: _allAjuanList.isNotEmpty,
           isAllApprovedAndConflictFree: _isAllApprovedAndConflictFree,
           onRunCSPEngine: _runCSPEngine,
           onToggleSubmissionStatus: _toggleSubmissionStatus,
         ),
         const SizedBox(height: AppSpacing.md),
 
-        // ── Permintaan Banding Dosen ──
-        AdminBandingSection(
-          allAjuanList: _allAjuanList,
-          onRefreshData: _loadAdminData,
-        ),
         const SizedBox(height: AppSpacing.lg),
       ],
     );

@@ -178,7 +178,11 @@ class AjuanPengajaranModel {
       semester: int.tryParse((json['semester'] ?? '1').toString()) ?? 1,
       kelasNama: (json['kelasNama'] ?? json['kelas_nama'] ?? 'A').toString(),
       jumlahMahasiswa: int.tryParse((json['jumlahMahasiswa'] ?? json['jumlah_mahasiswa'] ?? '30').toString()) ?? 30,
-      status: (json['status'] ?? 'menunggu_kaprodi').toString(),
+      status: () {
+        final s = (json['status'] ?? 'menunggu_kaprodi').toString();
+        if (s == 'banding_diajukan' || s == 'mengajukan_banding') return 'menunggu_banding';
+        return s;
+      }(),
       catatanDosen: (json['catatanDosen'] ?? json['catatan_dosen'])?.toString(),
       catatanKaProdi: (json['catatanKaProdi'] ?? json['catatan_kaprodi'])?.toString(),
       catatanDekan: (json['catatanDekan'] ?? json['catatan_dekan'])?.toString(),

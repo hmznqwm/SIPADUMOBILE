@@ -2,7 +2,12 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Any
 from datetime import datetime
 
+# [PRESENTASI] Pydantic Schemas (Data Transfer Object / DTO)
+# Digunakan oleh FastAPI untuk validasi otomatis request payload dari frontend.
+# Memastikan tipe data (string, integer, email) valid sebelum diproses oleh controller.
+
 class LoginRequest(BaseModel):
+    """[PRESENTASI] Skema validasi untuk payload request saat user melakukan Login."""
     email: Optional[str] = None
     id: Optional[str] = None
     username: Optional[str] = None
@@ -56,9 +61,9 @@ class MataKuliahSchema(BaseModel):
     id: str
     nama: str
     sks: int = 3
-    jurusan_id: str = "JUR001"
-    jurusan_nama: str = "Teknik Informatika"
-    fakultas_nama: str = "Fakultas Sains & Teknologi"
+    jurusan_id: Optional[str] = None
+    jurusan_nama: Optional[str] = None
+    fakultas_nama: Optional[str] = None
     dosen_id: str
     semester_id: str = "SEM001"
     semester_angka: int = 1
@@ -71,13 +76,15 @@ class UserSchema(BaseModel):
     email: str
     password: Optional[str] = None
     role: str
-    jurusan_id: Optional[str] = "JUR001"
-    jurusan_nama: Optional[str] = "Teknik Informatika"
-    fakultas_nama: Optional[str] = "Fakultas Sains & Teknologi"
+    jurusan_id: Optional[str] = None
+    jurusan_nama: Optional[str] = None
+    fakultas_nama: Optional[str] = None
     avatar_url: Optional[str] = None
     is_priority: Optional[bool] = False
 
-# Response wrapper to match PHP JSON API format
+# [PRESENTASI] Response Wrapper
+# Standar format JSON (Envelope) untuk setiap balasan dari backend ke frontend.
+# Membuat konsumsi data dari frontend API (seperti Axios/Fetch) menjadi lebih seragam dan aman.
 class ApiResponse(BaseModel):
     status: str = "success"
     message: str

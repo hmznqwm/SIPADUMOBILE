@@ -16,15 +16,12 @@ Future<String?> showSearchableFakultasPicker({
     allFakultas.add('Semua Fakultas');
   }
   if (fakultasData.isNotEmpty) {
-    allFakultas.addAll(fakultasData.map((f) => f['nama'] as String).toList());
-  } else {
-    allFakultas.addAll([
-      'Fakultas Sains & Teknologi',
-      'Fakultas Ekonomi & Bisnis',
-      'Fakultas Ilmu Komputer',
-      'Fakultas Kedokteran',
-      'Fakultas Teknik',
-    ]);
+    allFakultas.addAll(
+      fakultasData
+          .map((f) => (f['nama'] ?? '').toString().trim())
+          .where((s) => s.isNotEmpty)
+          .toList(),
+    );
   }
 
   final Set<String> selectedSet = (currentSelected ?? '')
@@ -323,17 +320,6 @@ Future<String?> showSearchableProdiPicker({
     }
   }
 
-  if (prodiList.isEmpty) {
-    prodiList = [
-      {
-        'prodi': 'Teknik Informatika',
-        'fakultas': 'Fakultas Sains & Teknologi',
-      },
-      {'prodi': 'Sistem Informasi', 'fakultas': 'Fakultas Sains & Teknologi'},
-      {'prodi': 'Manajemen', 'fakultas': 'Fakultas Ekonomi & Bisnis'},
-      {'prodi': 'Akuntansi', 'fakultas': 'Fakultas Ekonomi & Bisnis'},
-    ];
-  }
 
   final Set<String> selectedSet = (currentSelected ?? '')
       .split(', ')

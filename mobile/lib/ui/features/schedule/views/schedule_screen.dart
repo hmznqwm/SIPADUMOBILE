@@ -160,9 +160,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       }
       if (!isConflict) return false;
       if (isKaProdi) {
-        if (a.jurusanNama != (user?.jurusanNama ?? 'Teknik Informatika')) return false;
+        if (user != null && user.jurusanNama.isNotEmpty && a.jurusanNama.isNotEmpty) {
+          if (a.jurusanNama.toLowerCase() != user.jurusanNama.toLowerCase()) return false;
+        }
       } else if (isDekan) {
-        if (a.fakultasNama != 'Fakultas Sains & Teknologi') return false;
+        if (user != null && user.fakultasNama.isNotEmpty && a.fakultasNama.isNotEmpty) {
+          if (a.fakultasNama.toLowerCase() != user.fakultasNama.toLowerCase()) return false;
+        }
       }
       seenIds.add(a.id);
       return true;
@@ -217,61 +221,79 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         ),
         Container(height: 1, color: const Color(0xFFE2E8F0)),
         Expanded(
-          child: (isPrivileged && _selectedAdminTab == 1)
-              ? ScheduleConflictResolutionView(
-                  allAjuanList: _allAjuanList,
-                  selectedConflictIds: _selectedConflictIds,
-                  isConflictSelectionMode: _isConflictSelectionMode,
-                  onRefresh: _loadAjuanData,
-                  onConflictTap: _handleConflictTap,
-                  onConflictLongPress: _handleConflictLongPress,
-                  onShowBatchResolveDialog: _showBatchResolveConfirmationDialog,
-                )
-              : filteredList.isEmpty
-                  ? const EmptyStateWidget(
-                      icon: Icons.calendar_today_outlined,
-                      title: 'Tidak Ada Jadwal',
-                      message: 'Belum ada jadwal mengajar pada hari yang dipilih.',
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                      itemCount: filteredList.length > _displayedCount
-                          ? _displayedCount + 1
-                          : filteredList.length,
-                      itemBuilder: (context, index) {
-                        if (index == _displayedCount && filteredList.length > _displayedCount) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 14, bottom: 16),
+          child: Container(
+            color: const Color(0xFFF8FAFC),
+            child: (isPrivileged && _selectedAdminTab == 1)
+                ? ScheduleConflictResolutionView(
+                    allAjuanList: _allAjuanList,
+                    selectedConflictIds: _selectedConflictIds,
+                    isConflictSelectionMode: _isConflictSelectionMode,
+                    onRefresh: _loadAjuanData,
+                    onConflictTap: _handleConflictTap,
+                    onConflictLongPress: _handleConflictLongPress,
+                    onShowBatchResolveDialog: _showBatchResolveConfirmationDialog,
+                  )
+                : RefreshIndicator(
+                    onRefresh: () async {
+                      await context.read<ScheduleViewModel>().loadScheduleData();
+                      await _loadAjuanData();
+                    },
+                    color: AppColors.primary,
+                    child: filteredList.isEmpty
+                        ? SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
                             child: SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    _displayedCount += 10;
-                                  });
-                                },
-                                icon: const Icon(Icons.expand_more_rounded, size: 20),
-                                label: Text(
-                                  'Muat 10 Jadwal Lagi (${filteredList.length - _displayedCount} Tersisa)',
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.primary,
-                                  backgroundColor: AppColors.primary.withValues(alpha: 0.05),
-                                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.2),
-                                  padding: const EdgeInsets.symmetric(vertical: 13),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 0,
-                                ),
+                              height: MediaQuery.of(context).size.height * 0.6,
+                              child: const EmptyStateWidget(
+                                icon: Icons.calendar_today_outlined,
+                                title: 'Tidak Ada Jadwal',
+                                message: 'Belum ada jadwal mengajar pada hari yang dipilih.',
                               ),
                             ),
-                          );
-                        }
-                        return ScheduleCard(item: filteredList[index]);
-                      },
-                    ),
+                          )
+                        : ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                            itemCount: filteredList.length > _displayedCount
+                                ? _displayedCount + 1
+                                : filteredList.length,
+                            itemBuilder: (context, index) {
+                              if (index == _displayedCount && filteredList.length > _displayedCount) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 10, bottom: 16),
+                                  child: InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _displayedCount += 10;
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: const Text(
+                                        'Tampilkan Lainnya',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF475569),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return ScheduleCard(item: filteredList[index]);
+                            },
+                          ),
+                  ),
+          ),
         ),
       ],
     );

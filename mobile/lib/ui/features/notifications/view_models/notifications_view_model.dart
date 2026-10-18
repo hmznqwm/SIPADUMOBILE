@@ -8,6 +8,9 @@ import '../../../../data/models/notification_model.dart';
 import '../../../../data/repositories/auth_repository.dart';
 import '../../../../data/repositories/notification_repository.dart';
 
+/// [PRESENTASI] NotificationsViewModel:
+/// Mengatur state dan interaktivitas lonceng notifikasi (pesan sistem & pengumuman).
+/// Memisahkan logika badge (unread count) dari komponen UI agar lebih mudah di-testing.
 class NotificationsViewModel extends ChangeNotifier {
   final AuthRepository _authRepository;
   final NotificationRepository _notificationRepository;

@@ -8,8 +8,8 @@ import 'package:provider/provider.dart';
 import '../../../../config/constants.dart';
 import '../../../../data/mock/mock_database.dart';
 import '../../../../data/models/ajuan_pengajaran_model.dart';
-import '../../../../data/models/mata_kuliah_model.dart';
 import '../../../../data/services/api_service.dart';
+import '../../../core/widgets/wave_header_card.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../widgets/csp_confirmation_dialog.dart';
 
@@ -27,11 +27,9 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
   int _totalDosen = 0;
   int _totalMatkul = 0;
   int _totalJurusan = 0;
-  int _totalRuangan = 0;
-  int _totalGedung = 0;
   bool _isLoading = true;
   bool _isEngineRunning = false;
-  String _fakultasNama = 'Fakultas Sains & Teknologi';
+  String _fakultasNama = '';
 
   @override
   void initState() {
@@ -51,9 +49,7 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
     setState(() => _isLoading = true);
     try {
       final user = context.read<AuthViewModel>().currentUser;
-      if (user != null && user.fakultasNama.isNotEmpty && user.fakultasNama != 'Universitas') {
-        _fakultasNama = user.fakultasNama;
-      }
+      _fakultasNama = (user != null && user.fakultasNama != 'Universitas') ? user.fakultasNama : '';
 
       final api = context.read<ApiService>();
       await MockDatabase.initLocalCache(forceReload: true);
@@ -64,22 +60,25 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
       // ── Dosen: baca dari master data user (bukan dari ajuan) ──
       final allUsers = await api.getAllUsers();
       final fstDosen = allUsers.where((u) {
+        if (MockDatabase.deletedUserIds.contains(u.id) ||
+            MockDatabase.deletedUserIds.contains(u.nama) ||
+            MockDatabase.deletedUserIds.contains(u.email)) {
+          return false;
+        }
         if (u.role != 'dosen' && u.role != 'kajur') return false;
         return _matchFakultas(u.fakultasNama, _fakultasNama);
       }).toList();
 
-      // ── Ruangan & Gedung: baca dari master data ──
-      final allRuangan = await api.getRuanganList();
-      final effectiveRuangan = allRuangan.isNotEmpty ? allRuangan : MockDatabase.ruanganList;
-      final allGedung = await api.getGedungList();
-      final effectiveGedung = allGedung.isNotEmpty ? allGedung : MockDatabase.gedungList;
-
       // ── Matkul: baca dari live getAllMataKuliah() Supabase/Backend ──
       final allMatkul = await api.getAllMataKuliah();
-      final effectiveMatkul = allMatkul.isNotEmpty
-          ? allMatkul
-          : MockDatabase.matkulData.map((m) => MataKuliahModel.fromJson(m)).toList();
-      final fstMatkul = effectiveMatkul.where((m) => _matchFakultas(m.fakultasNama, _fakultasNama)).toList();
+      final effectiveMatkul = allMatkul;
+      final fstMatkul = effectiveMatkul.where((m) {
+        if (MockDatabase.deletedMatkulIds.contains(m.id) ||
+            MockDatabase.deletedMatkulIds.contains(m.nama)) {
+          return false;
+        }
+        return _matchFakultas(m.fakultasNama, _fakultasNama);
+      }).toList();
 
       // ── Jurusan: hitung dari jurusan unik di matkul & dosen fakultas ini ──
       final Set<String> jurusanSet = {};
@@ -96,7 +95,6 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
           }
         }
       }
-      if (jurusanSet.isEmpty) jurusanSet.add('Teknik Informatika');
 
       if (mounted) {
         setState(() {
@@ -104,8 +102,6 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
           _totalDosen = fstDosen.length;
           _totalMatkul = fstMatkul.length;
           _totalJurusan = jurusanSet.length;
-          _totalRuangan = effectiveRuangan.length;
-          _totalGedung = effectiveGedung.length;
         });
       }
     } catch (e) {
@@ -118,7 +114,7 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
   }
 
   bool get _isFacultyAllApprovedAndConflictFree {
-    if (_facultyAjuanList.isEmpty) return true;
+    if (_facultyAjuanList.isEmpty) return false;
     final unapprovedOrPending = _facultyAjuanList.where((a) =>
         a.status != 'disetujui_admin' &&
         a.status != 'disetujui' &&
@@ -130,6 +126,7 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
   }
 
   Future<void> _runFacultyCSPEngine() async {
+    if (_facultyAjuanList.isEmpty) return;
     if (_isFacultyAllApprovedAndConflictFree) {
       final forceRun = await showModalBottomSheet<bool>(
         context: context,
@@ -377,100 +374,6 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
     );
   }
 
-  Widget _buildMetricCard({
-    required String title,
-    required String value,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required Color bg,
-  }) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x04000000),
-            blurRadius: 3,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0F172A),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF64748B),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            width: 105,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: color.withValues(alpha: 0.25)),
-            ),
-            child: Text(
-              value,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -489,256 +392,386 @@ class _DekanDashboardViewState extends State<DekanDashboardView> {
     final pendingAjuan = _facultyAjuanList.where((a) => a.status == 'menunggu_dekan').toList();
     final pendingCount = pendingAjuan.length;
     final approvedCount = _facultyAjuanList.where((a) => a.status == 'menunggu_admin' || a.status == 'disetujui_admin').length;
-    final finalizedCount = _facultyAjuanList.where((a) => a.status == 'disetujui_admin').length;
+    final double ratioMenunggu = totalAjuan > 0 ? (pendingCount / totalAjuan) : 0.0;
+    final double ratioDisetujui = totalAjuan > 0 ? (approvedCount / totalAjuan) : 1.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── 1. Executive Header Card ──
+        // ── 1. Executive Header Card (Split Wave 2-Warna) ──
+        WaveHeaderCard(
+          showBrand: true,
+          title: _fakultasNama,
+          subtitle: 'Ringkasan data akademik dan koordinasi usulan jadwal fakultas.',
+        ),
+        const SizedBox(height: 12),
+
+        // ── 2. Section Title ──
+        const Text(
+          'Statistik Fakultas',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+            letterSpacing: -0.2,
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // ── 3. Hero Card: Usulan Jadwal Fakultas (Clean White Card with Line Comparison Bar) ──
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x05000000),
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Text(
+                'Usulan Jadwal Fakultas',
+                style: TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.1,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Baris Perbandingan Garis (Visual Comparison Bar)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: SizedBox(
+                  height: 6,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: totalAjuan == 0 ? 50 : (ratioMenunggu * 100).toInt().clamp(1, 99),
+                        child: Container(color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        flex: totalAjuan == 0 ? 50 : (ratioDisetujui * 100).toInt().clamp(1, 99),
+                        child: Container(color: const Color(0xFFE2E8F0)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Keterangan Jumlah Menunggu vs Disetujui
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(AppRadius.full),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.account_balance_rounded, color: Colors.white, size: 11),
-                        SizedBox(width: 4),
+                        Row(
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Menunggu Dekan',
+                              style: TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
                         Text(
-                          'DEKAN FAKULTAS',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
+                          '$pendingCount Ajuan',
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                      border: Border.all(color: const Color(0xFFA7F3D0)),
-                    ),
-                    child: const Text(
-                      'FST Aktif',
-                      style: TextStyle(
-                        color: Color(0xFF047857),
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    width: 1,
+                    height: 28,
+                    color: const Color(0xFFE2E8F0),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF94A3B8),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Diteruskan ke Admin',
+                              style: TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '$approvedCount Ajuan',
+                          style: const TextStyle(
+                            color: Color(0xFF0F172A),
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                _fakultasNama,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(height: 2),
-              const Text(
-                'Ringkasan data akademik dan koordinasi usulan jadwal fakultas.',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11.5,
-                ),
-              ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
-        // ── 2. Data Akademik Fakultas FST ──
-        const Text(
-          'Data Akademik Fakultas',
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        _buildMetricCard(
-          title: 'Jumlah Jurusan',
-          value: '$_totalJurusan Jurusan',
-          subtitle: 'Program Studi FST',
-          icon: Icons.account_tree_outlined,
-          color: AppColors.primary,
-          bg: const Color(0xFFF0FDFA),
-        ),
-        _buildMetricCard(
-          title: 'Jumlah Pengajar',
-          value: '$_totalDosen Pengajar',
-          subtitle: 'Dosen Aktif FST',
-          icon: Icons.people_alt_outlined,
-          color: AppColors.primary,
-          bg: const Color(0xFFF0FDFA),
-        ),
-        _buildMetricCard(
-          title: 'Jumlah Mata Kuliah',
-          value: '$_totalMatkul Matkul',
-          subtitle: 'Mata Kuliah FST',
-          icon: Icons.menu_book_rounded,
-          color: AppColors.primary,
-          bg: const Color(0xFFF0FDFA),
-        ),
-        _buildMetricCard(
-          title: 'Ruangan & Kelas Kampus',
-          value: '$_totalRuangan Ruang Kelas',
-          subtitle: '$_totalGedung Gedung Terdaftar',
-          icon: Icons.door_sliding_outlined,
-          color: AppColors.primary,
-          bg: const Color(0xFFF0FDFA),
-        ),
-        const SizedBox(height: 12),
-
-        // ── 3. Statistik Usulan Jadwal FST ──
-        const Text(
-          'Statistik Usulan Jadwal',
-          style: TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        _buildMetricCard(
-          title: 'Total Usulan',
-          value: '$totalAjuan Ajuan',
-          subtitle: 'Total Ajuan FST',
-          icon: Icons.list_alt_rounded,
-          color: AppColors.primary,
-          bg: const Color(0xFFF0FDFA),
-        ),
-        _buildMetricCard(
-          title: 'Menunggu Dekan',
-          value: '$pendingCount Ajuan',
-          subtitle: 'Perlu Persetujuan',
-          icon: Icons.pending_actions_rounded,
-          color: AppColors.primary,
-          bg: const Color(0xFFF0FDFA),
-        ),
-        _buildMetricCard(
-          title: 'Disetujui Dekan',
-          value: '$approvedCount Ajuan',
-          subtitle: 'Diteruskan ke Admin',
-          icon: Icons.fact_check_outlined,
-          color: AppColors.primary,
-          bg: const Color(0xFFF0FDFA),
-        ),
-        _buildMetricCard(
-          title: 'Final Admin',
-          value: '$finalizedCount Ajuan',
-          subtitle: 'Jadwal Telah Terbit',
-          icon: Icons.check_circle_outline,
-          color: AppColors.primary,
-          bg: const Color(0xFFF0FDFA),
+        // ── 4. Row 1: 2 White Cards (Program Studi & Dosen Fakultas) ──
+        Row(
+          children: [
+            Expanded(
+              child: _buildWhiteBentoCard(
+                title: 'Program Studi',
+                count: '$_totalJurusan',
+                subtitle: 'Program Studi',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildWhiteBentoCard(
+                title: 'Dosen Fakultas',
+                count: '$_totalDosen',
+                subtitle: 'Tenaga Pengajar',
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 10),
 
-        // ── 4. Button Otomasi CSP ──
+        // ── 5. Row 2: 2 White Cards (Mata Kuliah & Total Usulan) ──
+        Row(
+          children: [
+            Expanded(
+              child: _buildWhiteBentoCard(
+                title: 'Mata Kuliah',
+                count: '$_totalMatkul',
+                subtitle: 'Mata Kuliah',
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _buildWhiteBentoCard(
+                title: 'Total Usulan',
+                count: '$totalAjuan',
+                subtitle: 'Ajuan Fakultas',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // ── 7. Button Otomasi CSP ──
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x04000000),
                 blurRadius: 4,
-                offset: Offset(0, 1),
+                offset: Offset(0, 2),
               ),
             ],
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(7),
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.tune_rounded, color: AppColors.primary, size: 18),
+                child: const Icon(
+                  Icons.settings_outlined,
+                  color: Color(0xFF64748B),
+                  size: 20,
+                ),
               ),
-              const SizedBox(width: 10),
-              const Expanded(
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Otomasi Jadwal (CSP)',
+                    const Text(
+                      'Engine CSP',
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
+                        color: Color(0xFF0F172A),
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
-                      'Penyelarasan jadwal lintas prodi',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: AppColors.textSecondary,
+                      _facultyAjuanList.isEmpty
+                          ? 'Belum ada ajuan di $_fakultasNama'
+                          : _isFacultyAllApprovedAndConflictFree
+                              ? 'Jadwal Rapi & Optimal'
+                              : 'Penyelarasan seluruh prodi $_fakultasNama',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF64748B),
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 6),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
-                ),
-                onPressed: _isEngineRunning ? null : _runFacultyCSPEngine,
-                child: _isEngineRunning
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 90,
+                height: 34,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _facultyAjuanList.isEmpty
+                        ? const Color(0xFFF1F5F9)
+                        : _isFacultyAllApprovedAndConflictFree
+                            ? const Color(0xFF0F766E)
+                            : AppColors.primary,
+                    foregroundColor: _facultyAjuanList.isEmpty
+                        ? const Color(0xFF94A3B8)
+                        : Colors.white,
+                    elevation: 0,
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: (_facultyAjuanList.isEmpty || _isEngineRunning)
+                      ? null
+                      : _runFacultyCSPEngine,
+                  child: _isEngineRunning
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          _facultyAjuanList.isEmpty
+                              ? 'Data Kosong'
+                              : _isFacultyAllApprovedAndConflictFree
+                                  ? 'Jadwal Rapi'
+                                  : 'Jalankan',
+                          style: TextStyle(
+                            fontSize: _facultyAjuanList.isEmpty ? 11 : 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      )
-                    : const Text(
-                        'Jalankan',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                      ),
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
       ],
+    );
+  }
+
+  Widget _buildWhiteBentoCard({
+    required String title,
+    required String count,
+    required String subtitle,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x05000000),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF1E293B),
+              fontSize: 12.5,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            count,
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              height: 1.1,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

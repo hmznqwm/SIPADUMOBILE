@@ -52,40 +52,21 @@ class BandingAndRejectBottomSheets {
                 const SizedBox(height: 14),
 
                 // Header
-                Row(
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEA580C).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.swap_horiz_rounded,
-                        color: Color(0xFFEA580C),
-                        size: 24,
+                    Text(
+                      'Ajukan Banding Jadwal',
+                      style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Ajukan Banding Jadwal',
-                            style: TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Pengajuan keberatan / penyesuaian jadwal mengajar',
-                            style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Pengajuan keberatan / penyesuaian jadwal mengajar',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
                   ],
                 ),
@@ -146,6 +127,7 @@ class BandingAndRejectBottomSheets {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: selectedHari,
+                        icon: const SizedBox.shrink(),
                         isDense: true,
                         style: const TextStyle(fontSize: 12.5, color: Color(0xFF0F172A)),
                         decoration: InputDecoration(
@@ -288,42 +270,23 @@ class BandingAndRejectBottomSheets {
               const SizedBox(height: 14),
 
               // Header
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.cancel_outlined,
-                      color: AppColors.error,
-                      size: 24,
+                  const Text(
+                    'Tolak / Minta Revisi Ajuan',
+                    style: TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Tolak / Minta Revisi Ajuan',
-                          style: TextStyle(
-                            color: Color(0xFF0F172A),
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Dosen: ${ajuan.dosenNama} • ${ajuan.mataKuliahNama}',
-                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Ajuan ${ajuan.mataKuliahNama} (${ajuan.dosenNama})',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

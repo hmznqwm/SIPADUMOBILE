@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../config/constants.dart';
 import '../../../../data/services/api_service.dart';
@@ -228,9 +229,19 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final authViewModel = context.watch<AuthViewModel>();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: Stack(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Color(0xFFF8FAFC), // Sesuaikan dengan warna background agar tidak hitam pada gesture navigation
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: Stack(
         children: [
           // ── High-End Subtle Dot Grid & Ambient Glow Background ──
           const Positioned.fill(
@@ -283,11 +294,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                                 child: Image.asset(
-                                  'assets/logo/logoapp.png',
+                                  'assets/logo/iconaplikasi.png',
                                   fit: BoxFit.contain,
                                   errorBuilder: (context, error, stackTrace) =>
                                       Image.asset(
-                                        'assets/logo/logo.png',
+                                        'assets/logo/logoapp.png',
                                         fit: BoxFit.contain,
                                         errorBuilder:
                                             (context, error, stackTrace) =>
@@ -716,6 +727,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
         ],
       ),
+    ),
     );
   }
 }

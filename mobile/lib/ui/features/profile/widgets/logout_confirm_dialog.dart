@@ -24,13 +24,13 @@ void showLogoutConfirmDialog(BuildContext context) {
                 width: 58,
                 height: 58,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF2F2),
+                  color: const Color(0xFFF1F5F9),
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFFCA5A5), width: 1.5),
+                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
                 ),
                 child: const Icon(
                   Icons.logout_rounded,
-                  color: Color(0xFFDC2626),
+                  color: Color(0xFF0F172A),
                   size: 26,
                 ),
               ),
@@ -84,7 +84,7 @@ void showLogoutConfirmDialog(BuildContext context) {
                       height: 44,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFDC2626),
+                          backgroundColor: const Color(0xFF0F172A),
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),

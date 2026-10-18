@@ -6,8 +6,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../config/constants.dart';
 import '../../../../data/models/user_model.dart';
+import '../../../../utils/academic_year_helper.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../widgets/change_password_dialog.dart';
 import '../widgets/logout_confirm_dialog.dart';
@@ -19,23 +19,7 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthViewModel>().currentUser;
-
-    String roleDisplay = 'Pengguna';
-    Color roleColor = AppColors.primary;
-    if (user?.role == 'admin') {
-      roleDisplay = 'Super Admin';
-      roleColor = const Color(0xFF047857);
-    } else if (user?.role == 'dekan') {
-      roleDisplay = 'Dekan FST';
-      roleColor = const Color(0xFF059669);
-    } else if (user?.role == 'kajur') {
-      roleDisplay = 'Kaprodi TI';
-      roleColor = const Color(0xFF10B981);
-    } else if (user?.role == 'dosen') {
-      roleDisplay = 'Dosen Pengampu';
-      roleColor = const Color(0xFF16A34A);
-    }
-
+    final roleConfig = _getRoleConfig(user?.role);
     final initial = (user?.nama.isNotEmpty == true) ? user!.nama[0].toUpperCase() : 'U';
 
     return SingleChildScrollView(
@@ -71,17 +55,24 @@ class ProfileScreen extends StatelessWidget {
                             padding: const EdgeInsets.all(3),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: roleColor.withValues(alpha: 0.4), width: 2),
+                              border: Border.all(color: roleConfig.borderColor, width: 2.5),
                             ),
-                            child: _buildAvatarImage(user, roleColor, initial),
+                            child: _buildAvatarImage(user, roleConfig.textColor, initial),
                           ),
                           Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
                               color: Colors.white,
                               shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                            child: Icon(Icons.camera_alt_rounded, color: roleColor, size: 18),
+                            child: Icon(Icons.camera_alt_rounded, color: roleConfig.textColor, size: 16),
                           ),
                         ],
                       ),
@@ -110,19 +101,19 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
-                    color: roleColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: roleColor.withValues(alpha: 0.3)),
+                    color: roleConfig.backgroundColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: roleConfig.borderColor, width: 1.2),
                   ),
                   child: Text(
-                    roleDisplay.toUpperCase(),
+                    roleConfig.title,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: roleColor,
-                      letterSpacing: 0.6,
+                      color: roleConfig.textColor,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),
@@ -151,13 +142,19 @@ class ProfileScreen extends StatelessWidget {
                 _buildDetailTile(
                   icon: Icons.school_outlined,
                   label: 'Program Studi',
-                  value: user?.jurusanNama ?? 'Teknik Informatika',
+                  value: (user?.jurusanNama != null && user!.jurusanNama.isNotEmpty) ? user.jurusanNama : '-',
                 ),
                 const Divider(height: 1, indent: 56, endIndent: 16),
                 _buildDetailTile(
                   icon: Icons.account_balance_outlined,
                   label: 'Fakultas',
-                  value: user?.fakultasNama ?? 'Fakultas Sains & Teknologi',
+                  value: (user?.fakultasNama != null && user!.fakultasNama.isNotEmpty) ? user.fakultasNama : '-',
+                ),
+                const Divider(height: 1, indent: 56, endIndent: 16),
+                _buildDetailTile(
+                  icon: Icons.calendar_today_outlined,
+                  label: 'Semester Aktif',
+                  value: AcademicYearHelper.getCurrentSemester(),
                 ),
               ],
             ),
@@ -177,7 +174,7 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 children: [
                   _buildActionTile(
-                    icon: Icons.lock_reset_rounded,
+                    icon: Icons.lock_outline_rounded,
                     label: 'Ubah Kata Sandi',
                     subtitle: 'Perbarui kata sandi akun Anda',
                     onTap: () {
@@ -198,15 +195,15 @@ class ProfileScreen extends StatelessWidget {
             height: 50,
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFDC2626),
-                side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
+                foregroundColor: const Color(0xFF0F172A),
+                side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                backgroundColor: const Color(0xFFFEF2F2),
+                backgroundColor: const Color(0xFFF1F5F9),
               ),
-              icon: const Icon(Icons.logout_rounded, size: 20),
+              icon: const Icon(Icons.logout_rounded, size: 20, color: Color(0xFF0F172A)),
               label: const Text(
                 'Keluar Dari Akun',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A)),
               ),
               onPressed: () => showLogoutConfirmDialog(context),
             ),
@@ -279,10 +276,10 @@ class ProfileScreen extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(9),
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
+            color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: AppColors.primary, size: 20),
+          child: Icon(icon, color: const Color(0xFF475569), size: 20),
         ),
         title: Text(
           label,
@@ -327,7 +324,7 @@ class ProfileScreen extends StatelessWidget {
 
     return CircleAvatar(
       radius: 38,
-      backgroundColor: roleColor.withValues(alpha: 0.1),
+      backgroundColor: const Color(0xFFF1F5F9),
       child: Text(
         initial,
         style: TextStyle(
@@ -338,4 +335,58 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RoleConfig {
+  final String title;
+  final Color textColor;
+  final Color backgroundColor;
+  final Color borderColor;
+
+  const _RoleConfig({
+    required this.title,
+    required this.textColor,
+    required this.backgroundColor,
+    required this.borderColor,
+  });
+}
+
+_RoleConfig _getRoleConfig(String? role) {
+  final r = role?.toLowerCase().trim() ?? '';
+  if (r == 'admin') {
+    return const _RoleConfig(
+      title: 'Super Admin',
+      textColor: Color(0xFF0F172A), // Slate 900
+      backgroundColor: Color(0xFFF1F5F9), // Slate 100
+      borderColor: Color(0xFFCBD5E1), // Slate 300
+    );
+  } else if (r == 'dekan') {
+    return const _RoleConfig(
+      title: 'Dekan Fakultas',
+      textColor: Color(0xFF581C87), // Deep Purple 900
+      backgroundColor: Color(0xFFF3E8FF), // Purple 100
+      borderColor: Color(0xFFD8B4FE), // Purple 300
+    );
+  } else if (r == 'kajur') {
+    return const _RoleConfig(
+      title: 'Ketua Program Studi',
+      textColor: Color(0xFFB45309), // Warm Amber / Bronze 700
+      backgroundColor: Color(0xFFFEF3C7), // Amber 100
+      borderColor: Color(0xFFFDE68A), // Amber 200
+    );
+  } else if (r == 'dosen') {
+    return const _RoleConfig(
+      title: 'Dosen Pengampu',
+      textColor: Color(0xFF0369A1), // Sapphire / Academic Blue 700
+      backgroundColor: Color(0xFFE0F2FE), // Sky 100
+      borderColor: Color(0xFFBAE6FD), // Sky 200
+    );
+  }
+
+  return const _RoleConfig(
+    title: 'Pengguna',
+    textColor: Color(0xFF334155),
+    backgroundColor: Color(0xFFF8FAFC),
+    borderColor: Color(0xFFE2E8F0),
+  );
 }

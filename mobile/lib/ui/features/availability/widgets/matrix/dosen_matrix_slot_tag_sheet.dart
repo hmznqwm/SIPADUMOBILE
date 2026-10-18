@@ -14,6 +14,22 @@ void showDosenMatrixSlotTagDialog(
 ) {
   final currentTag = viewModel.slotTags[slot.id];
   final isSelected = viewModel.selectedSlotIds.contains(slot.id);
+  final messenger = ScaffoldMessenger.of(context);
+
+  void report(bool ok) {
+    if (ok) return;
+    final msg = viewModel.errorMessage;
+    if (msg == null || msg.isEmpty) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+  }
 
   showModalBottomSheet(
     context: context,
@@ -103,8 +119,9 @@ void showDosenMatrixSlotTagDialog(
                     // Opsi 1: Fleksibel / Bebas
                     InkWell(
                       onTap: () {
-                        viewModel.setSlotTag(slot.id, null);
+                        final ok = viewModel.setSlotTag(slot.id, null);
                         Navigator.pop(ctx);
+                        report(ok);
                       },
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
@@ -214,20 +231,26 @@ void showDosenMatrixSlotTagDialog(
                                   currentTag.mataKuliahId == mk.id &&
                                   currentTag.kelasNama == kelas;
 
-                              // Cek apakah matkul dan kelas ini sudah ditautkan di slot lain
-                              String? otherSlotLabel;
+                              // Cek apakah matkul dan kelas ini sudah ditautkan di slot ini atau slot lain
+                              final taggedSlotList = <dynamic>[];
                               for (final entry in viewModel.slotTags.entries) {
-                                if (entry.key != slot.id &&
-                                    entry.value.mataKuliahId == mk.id &&
+                                if (entry.value.mataKuliahId == mk.id &&
                                     entry.value.kelasNama == kelas) {
                                   final matching = viewModel.allSlots
                                       .where((s) => s.id == entry.key)
                                       .firstOrNull;
-                                  otherSlotLabel = matching != null
-                                      ? '${matching.hari}, ${matching.label}'
-                                      : 'Slot Lain';
-                                  break;
+                                  if (matching != null) {
+                                    taggedSlotList.add(matching);
+                                  }
                                 }
+                              }
+                              taggedSlotList.sort((a, b) => (a.jamMulai as String).compareTo(b.jamMulai as String));
+                              
+                              String? otherSlotLabel;
+                              if (taggedSlotList.isNotEmpty && !isThisTag) {
+                                final first = taggedSlotList.first;
+                                final last = taggedSlotList.last;
+                                otherSlotLabel = '${first.hari}, ${first.jamMulai} - ${last.jamSelesai}';
                               }
 
                           return Padding(
@@ -242,8 +265,9 @@ void showDosenMatrixSlotTagDialog(
                                   fakultasNama: mk.fakultasNama,
                                   sks: mk.sks,
                                 );
-                                viewModel.setSlotTag(slot.id, newTag);
+                                final ok = viewModel.setSlotTag(slot.id, newTag);
                                 Navigator.pop(ctx);
+                                report(ok);
                               },
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
@@ -293,17 +317,45 @@ void showDosenMatrixSlotTagDialog(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            mk.nama,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF0F172A),
-                                            ),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  mk.nama,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF0F172A),
+                                                  ),
+                                                ),
+                                              ),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 6,
+                                                  vertical: 2,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: mk.isPraktikum
+                                                      ? const Color(0xFF16A34A).withValues(alpha: 0.12)
+                                                      : AppColors.primary.withValues(alpha: 0.1),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  mk.isPraktikum ? '90m/SKS' : '50m/SKS',
+                                                  style: TextStyle(
+                                                    fontSize: 9.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: mk.isPraktikum
+                                                        ? const Color(0xFF15803D)
+                                                        : AppColors.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                           const SizedBox(height: 3),
                                           Text(
-                                            '${mk.sks} SKS • ${mk.jurusanNama} • ${mk.fakultasNama}',
+                                            '${mk.labelDurasi} • ${mk.jurusanNama} • ${mk.fakultasNama}',
                                             style: const TextStyle(
                                               fontSize: 11,
                                               color: Color(0xFF64748B),
@@ -324,9 +376,9 @@ void showDosenMatrixSlotTagDialog(
                                                 borderRadius:
                                                     BorderRadius.circular(6),
                                               ),
-                                              child: const Text(
-                                                '✓ Terpilih di slot ini',
-                                                style: TextStyle(
+                                              child: Text(
+                                                '✓ Terikat di slot ini (${mk.sks} SKS • ${mk.totalDurasiMenit} Menit)',
+                                                style: const TextStyle(
                                                   fontSize: 10.5,
                                                   fontWeight: FontWeight.bold,
                                                   color: AppColors.primary,
@@ -425,8 +477,9 @@ void showDosenMatrixSlotTagDialog(
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     onPressed: () {
-                      viewModel.toggleSlot(slot.id);
+                      final ok = viewModel.toggleSlot(slot.id);
                       Navigator.pop(ctx);
+                      report(ok);
                     },
                   ),
                 ),
